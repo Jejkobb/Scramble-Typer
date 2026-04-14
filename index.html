@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scramble Typer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hud card">
+      <div class="hud-title-row">
+        <h1>Scramble Typer</h1>
+        <label class="pairs-control" for="pairsPerRound">
+          <span>Swaps / round</span>
+          <input id="pairsPerRound" type="number" min="1" max="10" value="1" inputmode="numeric">
+        </label>
+      </div>
+      <div class="stats-grid">
+        <p><span>Round</span><strong id="roundStat">1</strong></p>
+        <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
+        <p><span>Home Keys Left</span><strong id="homeKeysStat">26</strong></p>
+        <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
+      </div>
+      <p id="statusLine" class="status-line">Type the word below. Every 5 words, keys swap places.</p>
+    </header>
+
+    <main class="play card">
+      <p class="prompt">Type this word</p>
+      <div id="wordDisplay" class="word-display" aria-live="polite"></div>
+      <div class="play-meta">
+        <p id="roundProgress">Word 1 / 5</p>
+        <p id="totalWords">0 words complete</p>
+      </div>
+      <button id="restartBtn" class="restart-btn hidden" type="button">Restart</button>
+    </main>
+
+    <section id="keyboardDock" aria-label="Keyboard">
+      <div id="keyboardStage">
+        <div id="swapBeam" aria-hidden="true"></div>
+      </div>
+      <p id="swapToast" class="swap-toast" aria-live="assertive"></p>
+    </section>
+  </div>
+
+  <div id="swapOverlay" aria-hidden="true">
+    <div class="swap-alert-card">
+      <p class="swap-warning-line">
+        <span class="warning-symbol" aria-hidden="true">!</span>
+        <span>Warning: Key Swap Incoming</span>
+      </p>
+      <div class="swap-preview-row">
+        <span id="overlayKeyA" class="preview-key">A</span>
+        <span class="preview-arrow"><-></span>
+        <span id="overlayKeyB" class="preview-key">B</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
