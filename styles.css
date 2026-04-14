@@ -61,14 +61,6 @@ body {
   gap: 10px;
 }
 
-.hud-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 h1 {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
@@ -76,39 +68,17 @@ h1 {
   letter-spacing: 0.02em;
 }
 
-.mode-control,
-.pairs-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.83rem;
-  color: var(--muted);
-}
-
-.mode-control select,
-.pairs-control input {
-  width: 58px;
-  border-radius: 9px;
-  border: 1px solid rgba(130, 196, 210, 0.4);
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
-  font: inherit;
+.challenge-chip {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 240, 212, 0.4);
+  background: rgba(126, 240, 212, 0.14);
+  color: #b3ffe9;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
   font-weight: 700;
-  text-align: center;
-  padding: 6px 4px;
-}
-
-.mode-control select {
-  width: 132px;
-  text-align: left;
-  padding: 6px 8px;
-  cursor: pointer;
-}
-
-.mode-control select:focus,
-.pairs-control input:focus {
-  outline: 2px solid rgba(141, 247, 217, 0.66);
-  outline-offset: 1px;
+  text-transform: uppercase;
 }
 
 .stats-grid {
@@ -240,6 +210,63 @@ h1 {
 .restart-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(74, 208, 228, 0.32);
+}
+
+.share-panel {
+  margin-top: 2px;
+  border: 1px solid rgba(130, 196, 210, 0.28);
+  border-radius: 12px;
+  background: rgba(5, 12, 17, 0.54);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.result-summary {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #d6eff7;
+}
+
+.share-text {
+  width: 100%;
+  resize: none;
+  border-radius: 10px;
+  border: 1px solid rgba(130, 196, 210, 0.42);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ecf8fc;
+  font: 600 0.82rem/1.35 "Plus Jakarta Sans", sans-serif;
+  padding: 8px 9px;
+}
+
+.share-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.share-btn {
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 11px;
+  background: linear-gradient(140deg, #24c5a0, #50cfe5);
+  color: #06242a;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.share-btn.secondary {
+  background: linear-gradient(140deg, #d8f2ff, #9fd5ff);
+  color: #0d2430;
+}
+
+.copy-status {
+  margin: 0;
+  min-height: 1em;
+  font-size: 0.78rem;
+  color: #bdf9e7;
 }
 
 .hidden {
@@ -601,11 +628,6 @@ h1 {
   .hud-title-row {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .hud-controls {
-    width: 100%;
-    justify-content: flex-start;
   }
 
   .play-meta {

@@ -11,28 +11,16 @@
     <header class="hud card">
       <div class="hud-title-row">
         <h1>Scramble Typer</h1>
-        <div class="hud-controls">
-          <label class="mode-control" for="gameMode">
-            <span>Mode</span>
-            <select id="gameMode">
-              <option value="endless">Endless</option>
-              <option value="sprint">5-Swap Sprint</option>
-            </select>
-          </label>
-          <label class="pairs-control" for="pairsPerRound">
-            <span>Swaps / round</span>
-            <input id="pairsPerRound" type="number" min="1" max="10" value="1" inputmode="numeric">
-          </label>
-        </div>
+        <p class="challenge-chip">Timed 5-Swap Challenge</p>
       </div>
       <div class="stats-grid">
         <p><span>Round</span><strong id="roundStat">1</strong></p>
         <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
-        <p><span id="progressLabel">Home Keys Left</span><strong id="progressStat">26</strong></p>
+        <p><span id="progressLabel">Swaps</span><strong id="progressStat">0 / 5</strong></p>
         <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
         <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
       </div>
-      <p id="statusLine" class="status-line">Type the word below. Every 5 words, keys swap places.</p>
+      <p id="statusLine" class="status-line">Finish 5 swaps as fast as you can.</p>
     </header>
 
     <main class="play card">
@@ -43,6 +31,15 @@
         <p id="totalWords">0 words complete</p>
       </div>
       <button id="restartBtn" class="restart-btn hidden" type="button">Restart</button>
+      <div id="sharePanel" class="share-panel hidden">
+        <p id="resultSummary" class="result-summary"></p>
+        <textarea id="shareText" class="share-text" rows="3" readonly></textarea>
+        <div class="share-actions">
+          <button id="copyScoreBtn" class="share-btn" type="button">Copy Score</button>
+          <button id="nativeShareBtn" class="share-btn secondary hidden" type="button">Share</button>
+        </div>
+        <p id="copyStatus" class="copy-status"></p>
+      </div>
     </main>
 
     <section id="keyboardDock" aria-label="Keyboard">

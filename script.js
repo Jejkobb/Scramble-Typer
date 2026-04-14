@@ -6,14 +6,9 @@ const KEY_ROWS = [
   ["Z", "X", "C", "V", "B", "N", "M"],
 ];
 
-const GAME_MODES = {
-  ENDLESS: "endless",
-  SPRINT: "sprint",
-};
 const ROW_OFFSETS = [0, 0.5, 1.3];
 const ROUND_WORD_COUNT = 5;
-const PAIR_MIN = 1;
-const PAIR_MAX = 10;
+const SWAPS_PER_ROUND = 1;
 const MIN_RECENT_SWAP_WORDS_PER_ROUND = 3;
 const SPRINT_TARGET_SWAPS = 5;
 const WORD_MIN_LENGTH = 4;
@@ -92,8 +87,6 @@ const swapOverlay = document.getElementById("swapOverlay");
 const overlayKeyA = document.getElementById("overlayKeyA");
 const overlayKeyB = document.getElementById("overlayKeyB");
 const wordDisplay = document.getElementById("wordDisplay");
-const gameModeSelect = document.getElementById("gameMode");
-const pairsPerRoundInput = document.getElementById("pairsPerRound");
 const roundStat = document.getElementById("roundStat");
 const wordStat = document.getElementById("wordStat");
 const progressLabel = document.getElementById("progressLabel");
@@ -104,12 +97,17 @@ const statusLine = document.getElementById("statusLine");
 const roundProgress = document.getElementById("roundProgress");
 const totalWords = document.getElementById("totalWords");
 const restartBtn = document.getElementById("restartBtn");
+const sharePanel = document.getElementById("sharePanel");
+const resultSummary = document.getElementById("resultSummary");
+const shareText = document.getElementById("shareText");
+const copyScoreBtn = document.getElementById("copyScoreBtn");
+const nativeShareBtn = document.getElementById("nativeShareBtn");
+const copyStatus = document.getElementById("copyStatus");
 
 const tokens = [];
 const slotIndex = new Map();
 
 const state = {
-  gameMode: GAME_MODES.ENDLESS,
   round: 1,
   words: [],
   wordIndex: 0,
@@ -185,13 +183,12 @@ function createKeyboard() {
 
 function bindEvents() {
   document.addEventListener("keydown", onKeyDown);
-  gameModeSelect.addEventListener("change", () => {
-    startNewGame();
-  });
-  pairsPerRoundInput.addEventListener("change", () => {
-    pairsPerRoundInput.value = String(getPairsPerRound());
-  });
   restartBtn.addEventListener("click", startNewGame);
+  copyScoreBtn.addEventListener("click", copyShareScore);
+  nativeShareBtn.addEventListener("click", shareScoreNatively);
+  if (navigator.share) {
+    nativeShareBtn.classList.remove("hidden");
+  }
 }
 
 function onKeyDown(event) {
@@ -201,10 +198,6 @@ function onKeyDown(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
-  if (event.target === pairsPerRoundInput || event.target === gameModeSelect) {
-    return;
-  }
-
   const pressed = event.key.toUpperCase();
   if (!/^[A-Z]$/.test(pressed)) {
     return;
@@ -295,35 +288,19 @@ async function runScramblePhase() {
   updateStats();
   const roundRecentSwapLetters = new Set();
 
-  if (isSprintMode() && state.swapCount >= SPRINT_TARGET_SWAPS) {
+  if (state.swapCount >= SPRINT_TARGET_SWAPS) {
     finishGame();
     return;
   }
 
-  const fixedBefore = getFixedSlots().length;
-  if (!isSprintMode() && fixedBefore === 0) {
-    finishGame();
-    return;
-  }
-
-  const fixedLimit = isSprintMode()
-    ? getPairsPerRound()
-    : Math.ceil(fixedBefore / 2);
-  const remainingForGoal = isSprintMode()
-    ? SPRINT_TARGET_SWAPS - state.swapCount
-    : Number.POSITIVE_INFINITY;
-  const swapsThisRound = Math.max(0, Math.min(getPairsPerRound(), fixedLimit, remainingForGoal));
+  const remainingForGoal = SPRINT_TARGET_SWAPS - state.swapCount;
+  const swapsThisRound = Math.max(0, Math.min(SWAPS_PER_ROUND, remainingForGoal));
   if (swapsThisRound === 0) {
     finishGame();
     return;
   }
 
-  const remainingAfterRound = isSprintMode() ? (SPRINT_TARGET_SWAPS - state.swapCount) : null;
-  if (isSprintMode()) {
-    setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remainingAfterRound} swap${remainingAfterRound === 1 ? "" : "s"} left).`);
-  } else {
-    setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"}...`);
-  }
+  setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remainingForGoal} swap${remainingForGoal === 1 ? "" : "s"} left).`);
 
   for (let step = 1; step <= swapsThisRound; step += 1) {
     const pair = pickProgressSwapPair();
@@ -335,12 +312,7 @@ async function runScramblePhase() {
     updateStats();
   }
 
-  if (isSprintMode() && state.swapCount >= SPRINT_TARGET_SWAPS) {
-    finishGame();
-    return;
-  }
-
-  if (!isSprintMode() && getFixedSlots().length === 0) {
+  if (state.swapCount >= SPRINT_TARGET_SWAPS) {
     finishGame();
     return;
   }
@@ -354,11 +326,7 @@ async function runScramblePhase() {
 
   renderWord();
   updateStats();
-  if (isSprintMode()) {
-    setStatus(`Round ${state.round} started. Reach ${SPRINT_TARGET_SWAPS} total swaps as fast as possible.`);
-  } else {
-    setStatus(`Round ${state.round} started. Adapt to the new key map.`);
-  }
+  setStatus(`Round ${state.round} started. Reach ${SPRINT_TARGET_SWAPS} total swaps as fast as possible.`);
 }
 
 async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
@@ -564,15 +532,6 @@ function rebuildSlotIndex() {
   }
 }
 
-function getPairsPerRound() {
-  const parsed = Number.parseInt(pairsPerRoundInput.value, 10);
-  if (Number.isNaN(parsed)) {
-    return PAIR_MIN;
-  }
-  const clamped = Math.min(PAIR_MAX, Math.max(PAIR_MIN, parsed));
-  return clamped;
-}
-
 function setStatus(message) {
   statusLine.textContent = message;
 }
@@ -640,15 +599,9 @@ function renderWord() {
 function updateStats() {
   roundStat.textContent = String(state.round);
   wordStat.textContent = `${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
-  if (isSprintMode()) {
-    progressLabel.textContent = "Swaps";
-    progressStat.textContent = `${state.swapCount} / ${SPRINT_TARGET_SWAPS}`;
-    timeStat.textContent = formatElapsedMs(getElapsedMs());
-  } else {
-    progressLabel.textContent = "Home Keys Left";
-    progressStat.textContent = String(getFixedSlots().length);
-    timeStat.textContent = "--:--.-";
-  }
+  progressLabel.textContent = "Swaps";
+  progressStat.textContent = `${state.swapCount} / ${SPRINT_TARGET_SWAPS}`;
+  timeStat.textContent = formatElapsedMs(getElapsedMs());
   mistakeStat.textContent = String(state.mistakes);
   roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
   totalWords.textContent = `${state.totalWords} words complete`;
@@ -718,20 +671,15 @@ function finishGame() {
   state.mode = "finished";
   clearHintKey();
   stopTimer();
-  if (isSprintMode()) {
-    const finalTime = formatElapsedMs(state.elapsedMs);
-    setStatus(`Sprint complete: ${SPRINT_TARGET_SWAPS} swaps in ${finalTime}.`);
-    showSwapToast(`Sprint clear in ${finalTime}.`);
-  } else {
-    setStatus("Keyboard fully scrambled. Every key has moved from home.");
-    showSwapToast("Fully scrambled. Challenge complete.");
-  }
+  const finalTime = formatElapsedMs(state.elapsedMs);
+  setStatus(`Challenge complete: ${SPRINT_TARGET_SWAPS} swaps in ${finalTime}.`);
+  showSwapToast(`Clear in ${finalTime}.`);
+  showSharePanel();
   restartBtn.classList.remove("hidden");
   updateStats();
 }
 
 function startNewGame() {
-  state.gameMode = gameModeSelect.value === GAME_MODES.SPRINT ? GAME_MODES.SPRINT : GAME_MODES.ENDLESS;
   state.round = 1;
   state.words = pickRoundWords(ROUND_WORD_COUNT);
   state.wordIndex = 0;
@@ -744,16 +692,15 @@ function startNewGame() {
   state.recentSwapLetters.clear();
   resetTimer();
 
-  pairsPerRoundInput.value = String(getPairsPerRound());
   restartBtn.classList.add("hidden");
+  sharePanel.classList.add("hidden");
+  copyStatus.textContent = "";
+  shareText.value = "";
+  resultSummary.textContent = "";
   resetKeyboard();
   renderWord();
   updateStats();
-  if (isSprintMode()) {
-    setStatus(`Sprint mode: reach ${SPRINT_TARGET_SWAPS} swaps fast. Source: ${state.dictionarySource}.`);
-  } else {
-    setStatus(`Type the word below. Every 5 words, keys swap places. Source: ${state.dictionarySource}.`);
-  }
+  setStatus(`Finish ${SPRINT_TARGET_SWAPS} swaps as fast as possible. Source: ${state.dictionarySource}.`);
 }
 
 async function loadLocalWordBank() {
@@ -780,11 +727,7 @@ async function loadLocalWordBank() {
     }
 
     if (state.mode === "playing") {
-      if (isSprintMode()) {
-        setStatus(`Sprint mode: reach ${SPRINT_TARGET_SWAPS} swaps fast. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
-      } else {
-        setStatus(`Type the word below. Every 5 words, keys swap places. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
-      }
+      setStatus(`Finish ${SPRINT_TARGET_SWAPS} swaps as fast as possible. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
     }
   } catch (_error) {
     setWordBank(FALLBACK_WORD_BANK, "fallback");
@@ -813,7 +756,7 @@ function clearWordFeedback() {
 }
 
 function startTimerIfNeeded() {
-  if (!isSprintMode() || state.timerStarted || state.mode !== "playing") {
+  if (state.timerStarted || state.mode !== "playing") {
     return;
   }
   state.timerStarted = true;
@@ -862,8 +805,49 @@ function formatElapsedMs(ms) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
 }
 
-function isSprintMode() {
-  return state.gameMode === GAME_MODES.SPRINT;
+function showSharePanel() {
+  const finalTime = formatElapsedMs(state.elapsedMs);
+  const link = window.location.href;
+  const message = `I finished Scramble Typer 5-Swap Challenge in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat me? ${link}`;
+  resultSummary.textContent = `Final time: ${finalTime}. Mistakes: ${state.mistakes}.`;
+  shareText.value = message;
+  sharePanel.classList.remove("hidden");
+}
+
+async function copyShareScore() {
+  const text = shareText.value.trim();
+  if (!text) {
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      shareText.focus();
+      shareText.select();
+      document.execCommand("copy");
+    }
+    copyStatus.textContent = "Score copied to clipboard.";
+  } catch (_error) {
+    copyStatus.textContent = "Could not copy automatically. You can copy the text manually.";
+  }
+}
+
+async function shareScoreNatively() {
+  if (!navigator.share || !shareText.value.trim()) {
+    return;
+  }
+
+  try {
+    await navigator.share({
+      title: "Scramble Typer Score",
+      text: shareText.value,
+      url: window.location.href,
+    });
+  } catch (_error) {
+    // User cancellation is a normal outcome.
+  }
 }
 
 function updateNextKeyHint() {
