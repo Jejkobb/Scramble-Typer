@@ -7,24 +7,30 @@ const KEY_ROWS = [
 ];
 
 const ROW_OFFSETS = [0, 0.5, 1.3];
-const ROUND_WORD_COUNT = 5;
+const BASE_ROUND_WORD_COUNT = 5;
+const FINAL_ROUND_WORD_COUNT = 10;
 const SWAPS_PER_ROUND = 1;
 const MIN_RECENT_SWAP_WORDS_PER_ROUND = 3;
-const TARGET_SWAPS = 5;
+const TARGET_SWAPS = 3;
 const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
+const RECENT_WORD_MEMORY = 140;
+const SHARE_QUERY_KEY = "g";
+const SHARE_WORD_INDEX_WIDTH = 3;
+const SHARE_TOTAL_WORD_COUNT = (BASE_ROUND_WORD_COUNT * TARGET_SWAPS) + FINAL_ROUND_WORD_COUNT;
 
-const SWAP_WARNING_DURATION = 1300;
-const SWAP_WARNING_FADE_GAP = 220;
-const SWAP_PREPARE_DURATION = 340;
-const SWAP_TRAVEL_DURATION = 860;
-const SWAP_SETTLE_DURATION = 320;
-const SWAP_END_GAP = 120;
+const SWAP_WARNING_DURATION = 1650;
+const SWAP_WARNING_FADE_GAP = 320;
+const SWAP_PREPARE_DURATION = 460;
+const SWAP_TRAVEL_DURATION = 1120;
+const SWAP_SETTLE_DURATION = 460;
+const SWAP_END_GAP = 220;
 
 const SWAP_NEAR_DISTANCE = 1.8;
 const SWAP_EXPANDED_DISTANCE = 2.6;
 const COPY_FEEDBACK_DURATION = 1800;
 const LOCAL_WORDS_FILE = "./words_alpha.txt";
+const GITHUB_WORDS_FILE = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt";
 const SWAP_COLOR_PALETTE = [
   { solid: "#54d2a0", soft: "rgba(84, 210, 160, 0.24)" },
   { solid: "#6ecbff", soft: "rgba(110, 203, 255, 0.24)" },
@@ -33,62 +39,22 @@ const SWAP_COLOR_PALETTE = [
   { solid: "#c59bff", soft: "rgba(197, 155, 255, 0.24)" },
 ];
 
-const BASE_WORD_BANK = [
-  "about", "above", "adapt", "agent", "angle", "apple", "arena", "badge", "basic", "beach",
-  "begin", "berry", "blink", "bloom", "board", "boost", "brain", "brave", "brick", "broad",
-  "brown", "build", "cable", "camel", "candy", "carry", "chain", "chair", "charm", "chase",
-  "chess", "chief", "chill", "civic", "class", "clean", "clear", "climb", "clock", "cloud",
-  "coast", "color", "comic", "coral", "craft", "crane", "crazy", "cream", "crisp", "crowd",
-  "dance", "debut", "delta", "dodge", "draft", "dream", "drift", "drive", "eager", "early",
-  "earth", "elite", "ember", "enjoy", "equal", "error", "event", "faith", "fancy", "feast",
-  "field", "flash", "fling", "flock", "focus", "force", "frame", "fresh", "frost", "fruit",
-  "giant", "glide", "globe", "glory", "grace", "grain", "graph", "green", "grind", "group",
-  "habit", "happy", "heart", "honey", "house", "human", "ideal", "image", "index", "inner",
-  "ivory", "jelly", "joint", "judge", "knock", "known", "label", "laser", "laugh", "layer",
-  "learn", "lemon", "level", "light", "limit", "logic", "lucky", "magic", "major", "maker",
-  "mango", "metal", "model", "money", "moral", "motor", "music", "noble", "noise", "north",
-  "ocean", "offer", "orbit", "order", "other", "paint", "panel", "party", "peace", "phase",
-  "phone", "piano", "pilot", "pitch", "plain", "plant", "point", "power", "prime", "prize",
-  "quest", "quick", "quiet", "radio", "raise", "range", "rapid", "reach", "relax", "rhyme",
-  "river", "robot", "rough", "round", "royal", "scale", "scene", "scope", "serve", "shade",
-  "shift", "shine", "skill", "smart", "smile", "solid", "sound", "spark", "speed", "spice",
-  "sport", "stack", "stage", "start", "steel", "storm", "style", "sugar", "sunny", "sweet",
-  "table", "taste", "teach", "thick", "thing", "throw", "tiger", "title", "today", "token",
-  "topic", "touch", "tower", "trace", "track", "trade", "train", "trend", "trust", "twice",
-  "unity", "upper", "urban", "value", "video", "vivid", "vocal", "voice", "water", "wheel",
-  "where", "white", "whole", "world", "young", "zebra",
-];
-
-const EXTRA_WORD_BANK = [
-  "atom", "beam", "clay", "drum", "echo", "fern", "glow", "hike", "jolt", "kite", "lava", "mint",
-  "navy", "opal", "palm", "quiz", "reef", "silk", "trip", "unit", "vast", "wave", "yarn", "zone",
-  "admire", "anchor", "breeze", "camera", "castle", "charge", "double", "effort", "flight", "garden",
-  "honest", "island", "jungle", "kitten", "legend", "market", "nature", "option", "planet", "quartz",
-  "rocket", "silver", "thrive", "update", "vacuum", "window", "zephyr",
-  "balance", "captain", "diamond", "episode", "freedom", "gallery", "harvest", "journey", "kingdom",
-  "library", "morning", "network", "outlook", "present", "quarter", "respect", "science", "temples",
-  "unified", "victory", "whisper", "yearing",
-  "abstract", "baseline", "corridor", "daylight", "elephant", "festival", "generate", "headline",
-  "interest", "junction", "landmark", "magnetic", "notebook", "optimize", "protocol", "question",
-  "reliable", "solution", "together", "ultimate", "validate", "workshop",
-  "adventure", "butterfly", "character", "direction", "explainer", "framework", "heartbeat", "keyboard",
-  "landscape", "magnitude", "navigator", "pineapple", "starlight", "treasured", "wildcards",
-  "backspace", "blueprint", "checklist", "developer", "fireworks", "goldenhour", "lighthouse",
-  "paperclips", "playground", "scrambler", "storybook", "typewriter",
-  "autopilots", "bookmarks", "earthbound", "flashcards", "groundwork", "newsworthy", "riversides",
-  "sunflower", "underlined", "viewpoints",
-  "afterglows", "backgrounds", "brainstorms", "friendships", "masterpiece", "northbounder",
-  "soundtracks",
-];
-
-const FALLBACK_WORD_BANK = sanitizeWords([...BASE_WORD_BANK, ...EXTRA_WORD_BANK]);
+const FALLBACK_WORD_BANK = sanitizeWords([
+  "about", "after", "again", "always", "around", "before", "better", "could",
+  "every", "first", "great", "house", "learn", "little", "money", "never",
+  "night", "other", "place", "point", "right", "small", "sound", "still",
+  "their", "there", "thing", "think", "three", "water", "where", "world",
+]);
 
 const ALPHABET = KEY_ROWS.flat();
+const ALPHABET_INDEX = new Map(ALPHABET.map((letter, index) => [letter, index]));
 const SLOT_LAYOUT = buildSlotLayout();
+const SHARE_TEMPLATE = decodeSharedRunFromUrl();
 
 let wordBank = [...FALLBACK_WORD_BANK];
 let wordsByLength = buildWordsByLength(wordBank);
 let availableLengths = Object.keys(wordsByLength).map((len) => Number(len)).sort((a, b) => a - b);
+let wordIndexByWord = buildWordIndexMap(wordBank);
 
 const pregameView = document.getElementById("pregameView");
 const pregameSource = document.getElementById("pregameSource");
@@ -102,8 +68,14 @@ const mistakeStat = document.getElementById("mistakeStat");
 const timeStat = document.getElementById("timeStat");
 const statusLine = document.getElementById("statusLine");
 const swapLegend = document.getElementById("swapLegend");
+const swapNode1 = document.getElementById("swapNode1");
+const swapNode2 = document.getElementById("swapNode2");
+const swapNode3 = document.getElementById("swapNode3");
+const swapNodeFinish = document.getElementById("swapNodeFinish");
 const roundProgress = document.getElementById("roundProgress");
 const totalWords = document.getElementById("totalWords");
+const roundBarText = document.getElementById("roundBarText");
+const roundBarFill = document.getElementById("roundBarFill");
 const wordDisplay = document.getElementById("wordDisplay");
 
 const keyboardStage = document.getElementById("keyboardStage");
@@ -128,6 +100,7 @@ const state = {
   phase: "pregame", // pregame | playing | scrambling | finished
   round: 1,
   words: [],
+  roundWordCount: BASE_ROUND_WORD_COUNT,
   wordIndex: 0,
   typedIndex: 0,
   wordVisualPristine: true,
@@ -146,8 +119,15 @@ const state = {
   swapColorByLetter: new Map(),
   swapHistory: [],
   hintToken: null,
+  dictionaryLoadPending: true,
   dictionarySource: "fallback",
   dictionaryWords: wordBank.length,
+  recentWords: [],
+  sharedTemplate: SHARE_TEMPLATE,
+  activeSharedPlan: null,
+  sharedWordCursor: 0,
+  runWordIndices: [],
+  runSwapPairs: [],
   shareText: "",
   copyResetTimer: null,
 };
@@ -216,28 +196,39 @@ function enterPregame() {
   gameView.classList.add("hidden");
   finishModal.classList.add("hidden");
   pregameView.classList.remove("hidden");
+  readyBtn.disabled = state.dictionaryLoadPending;
+  updateRoundBar();
+  updateSwapTrack();
   setPregameSourceText();
 }
 
 function startChallenge() {
+  if (state.dictionaryLoadPending) {
+    return;
+  }
+
   resetRunState();
   pregameView.classList.add("hidden");
   finishModal.classList.add("hidden");
   gameView.classList.remove("hidden");
 
+  state.activeSharedPlan = isSharePlanUsable(state.sharedTemplate) ? state.sharedTemplate : null;
+
   state.phase = "playing";
-  state.words = pickRoundWords(ROUND_WORD_COUNT);
+  state.roundWordCount = BASE_ROUND_WORD_COUNT;
+  state.words = pickRoundWords(state.roundWordCount);
   state.wordIndex = 0;
   state.typedIndex = 0;
 
   resetKeyboard();
   renderWord();
   updateStats();
-  setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible. Dictionary: ${state.dictionarySource}.`);
+  setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
 }
 
 function resetRunState() {
   state.round = 1;
+  state.roundWordCount = BASE_ROUND_WORD_COUNT;
   state.wordIndex = 0;
   state.typedIndex = 0;
   state.wordVisualPristine = true;
@@ -250,6 +241,11 @@ function resetRunState() {
   state.recentSwapLetters.clear();
   state.swapColorByLetter.clear();
   state.swapHistory = [];
+  state.recentWords = [];
+  state.activeSharedPlan = null;
+  state.sharedWordCursor = 0;
+  state.runWordIndices = [];
+  state.runSwapPairs = [];
   state.shareText = "";
 
   clearTimeout(state.copyResetTimer);
@@ -348,7 +344,7 @@ async function completeWord() {
   await wait(210);
   wordDisplay.classList.remove("is-complete");
 
-  if (state.wordIndex < ROUND_WORD_COUNT - 1) {
+  if (state.wordIndex < state.roundWordCount - 1) {
     state.wordIndex += 1;
     state.typedIndex = 0;
     state.wordVisualPristine = true;
@@ -387,13 +383,23 @@ async function runScramblePhase() {
   setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remaining} swap${remaining === 1 ? "" : "s"} left).`);
 
   for (let step = 1; step <= swapsThisRound; step += 1) {
-    const pair = pickProgressSwapPair();
+    const pair = getNextSwapPair();
     if (!pair) {
       break;
+    }
+    state.runSwapPairs.push([pair[0], pair[1]]);
+    const upcomingSwapNumber = state.swapCount + 1;
+    if (upcomingSwapNumber === TARGET_SWAPS) {
+      setStatus("Final swap incoming. Get ready.");
+      showSwapToast("Final swap incoming");
+      await wait(420);
     }
     const colorIndex = state.swapCount % SWAP_COLOR_PALETTE.length;
     await animateSwap(pair[0], pair[1], roundRecentSwapLetters, colorIndex);
     state.swapCount += 1;
+    if (upcomingSwapNumber === TARGET_SWAPS) {
+      showSwapToast("Final swap complete");
+    }
     updateStats();
   }
 
@@ -405,7 +411,8 @@ async function runScramblePhase() {
 
   state.round += 1;
   state.recentSwapLetters = roundRecentSwapLetters;
-  state.words = pickRoundWords(ROUND_WORD_COUNT, state.recentSwapLetters);
+  state.roundWordCount = BASE_ROUND_WORD_COUNT;
+  state.words = pickRoundWords(state.roundWordCount, state.recentSwapLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
   state.wordVisualPristine = true;
@@ -428,7 +435,7 @@ function finishChallenge() {
   finishTime.textContent = finalTime;
   finishMistakes.textContent = String(state.mistakes);
   finishWords.textContent = String(state.totalWords);
-  finishSummary.textContent = `You completed 5 swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
+  finishSummary.textContent = `You completed ${TARGET_SWAPS} swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
 
   state.shareText = buildShareText();
   copyScoreBtn.textContent = "Share Score";
@@ -438,8 +445,10 @@ function finishChallenge() {
 
 function buildShareText() {
   const finalTime = formatElapsedMs(state.elapsedMs);
-  const link = `${window.location.origin}${window.location.pathname}`;
-  return `I finished Scramble Typer (5-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
+  const payload = encodeSharedRun(state.runSwapPairs, state.runWordIndices);
+  const baseLink = `${window.location.origin}${window.location.pathname}`;
+  const link = payload ? `${baseLink}?${SHARE_QUERY_KEY}=${payload}` : baseLink;
+  return `I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
 }
 
 async function copyShareScore() {
@@ -646,6 +655,16 @@ function getSlotDistance(slotA, slotB) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+function getNextSwapPair() {
+  if (state.activeSharedPlan) {
+    const plannedPair = state.activeSharedPlan.swapPairs[state.swapCount];
+    if (plannedPair) {
+      return [plannedPair[0], plannedPair[1]];
+    }
+  }
+  return pickProgressSwapPair();
+}
+
 function placeToken(token, animate) {
   if (!animate) {
     token.el.classList.add("no-transition");
@@ -735,32 +754,91 @@ function renderWord() {
     wordDisplay.appendChild(span);
   }
 
-  roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
-  totalWords.textContent = `${state.totalWords} words complete`;
+  updateRoundProgressUI();
   updateNextKeyHint();
 }
 
 function updateStats() {
   roundStat.textContent = String(state.round);
-  wordStat.textContent = `${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
+  wordStat.textContent = `${Math.min(state.wordIndex + 1, state.roundWordCount)} / ${state.roundWordCount}`;
   progressStat.textContent = `${state.swapCount} / ${TARGET_SWAPS}`;
   mistakeStat.textContent = String(state.mistakes);
   timeStat.textContent = formatElapsedMs(getElapsedMs());
-  roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
+  updateRoundProgressUI();
+  updateSwapTrack();
+}
+
+function updateRoundProgressUI() {
+  roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, state.roundWordCount)} / ${state.roundWordCount}`;
   totalWords.textContent = `${state.totalWords} words complete`;
+  updateRoundBar();
+}
+
+function updateRoundBar() {
+  const ratio = getRoundProgressRatio();
+  const pct = Math.round(ratio * 100);
+  roundBarFill.style.width = `${pct}%`;
+  roundBarText.textContent = `${pct}%`;
+}
+
+function getRoundProgressRatio() {
+  if (state.roundWordCount <= 0) {
+    return 0;
+  }
+  if (state.phase === "finished" || state.phase === "scrambling") {
+    return 1;
+  }
+
+  const word = getCurrentWord();
+  const wordRatio = word && word.length > 0
+    ? Math.min(1, state.typedIndex / word.length)
+    : 0;
+  return Math.max(0, Math.min(1, (state.wordIndex + wordRatio) / state.roundWordCount));
+}
+
+function updateSwapTrack() {
+  const nodes = [swapNode1, swapNode2, swapNode3];
+  const completedSwaps = Math.min(state.swapCount, TARGET_SWAPS);
+  const finalStageActive = state.finalRoundActive || completedSwaps >= TARGET_SWAPS;
+
+  for (let i = 0; i < nodes.length; i += 1) {
+    const node = nodes[i];
+    const step = i + 1;
+    node.classList.remove("done", "current");
+
+    if (completedSwaps >= step) {
+      node.classList.add("done");
+      continue;
+    }
+
+    if (!finalStageActive && completedSwaps + 1 === step && state.phase !== "finished") {
+      node.classList.add("current");
+    }
+  }
+
+  swapNodeFinish.classList.remove("done", "current");
+  if (state.phase === "finished") {
+    swapNodeFinish.classList.add("done");
+    return;
+  }
+
+  if (finalStageActive) {
+    swapNodeFinish.classList.add("current");
+  }
 }
 
 function startFinalRound(preferredLetters) {
   state.finalRoundActive = true;
   state.round += 1;
-  state.words = pickRoundWords(ROUND_WORD_COUNT, preferredLetters);
+  state.roundWordCount = FINAL_ROUND_WORD_COUNT;
+  state.words = pickRoundWords(state.roundWordCount, preferredLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
   state.wordVisualPristine = true;
   state.phase = "playing";
   renderWord();
   updateStats();
-  setStatus("Final round. Complete 5 words with all swaps active.");
+  setStatus(`Final round. Complete ${FINAL_ROUND_WORD_COUNT} words with all swaps active.`);
 }
 
 function revealWordVisualsIfPristine() {
@@ -816,6 +894,11 @@ function updateSwapLegend() {
 }
 
 function pickRoundWords(count, preferredLetters = null) {
+  const plannedWords = pickSharedRoundWords(count);
+  if (plannedWords) {
+    return plannedWords;
+  }
+
   if (availableLengths.length === 0) {
     return Array.from({ length: count }, () => "TYPE");
   }
@@ -827,6 +910,7 @@ function pickRoundWords(count, preferredLetters = null) {
 
   const used = new Set();
   const roundWords = [];
+  const recentWordSet = new Set(state.recentWords);
   const preferredSet = preferredLetters && preferredLetters.size > 0 ? preferredLetters : null;
   const targetPreferredCount = preferredSet
     ? Math.min(MIN_RECENT_SWAP_WORDS_PER_ROUND, count, countWordsContainingAnyLetter(wordBank, preferredSet))
@@ -835,9 +919,15 @@ function pickRoundWords(count, preferredLetters = null) {
   let preferredPicked = 0;
   while (roundWords.length < count) {
     const mustUsePreferred = preferredPicked < targetPreferredCount;
-    let chosen = pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred);
+    let chosen = pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred, recentWordSet, true);
     if (!chosen && mustUsePreferred) {
-      chosen = pickWordWithRules(poolByLength, used, preferredSet, false);
+      chosen = pickWordWithRules(poolByLength, used, preferredSet, false, recentWordSet, true);
+    }
+    if (!chosen) {
+      chosen = pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred, recentWordSet, false);
+    }
+    if (!chosen && mustUsePreferred) {
+      chosen = pickWordWithRules(poolByLength, used, preferredSet, false, recentWordSet, false);
     }
     if (!chosen) {
       break;
@@ -845,6 +935,11 @@ function pickRoundWords(count, preferredLetters = null) {
 
     roundWords.push(chosen.toUpperCase());
     used.add(chosen);
+    const chosenIndex = wordIndexByWord.get(chosen);
+    if (Number.isInteger(chosenIndex)) {
+      state.runWordIndices.push(chosenIndex);
+    }
+    rememberRecentWord(chosen);
     if (preferredSet && wordHasAnyLetter(chosen, preferredSet)) {
       preferredPicked += 1;
     }
@@ -855,6 +950,32 @@ function pickRoundWords(count, preferredLetters = null) {
   }
 
   return roundWords;
+}
+
+function pickSharedRoundWords(count) {
+  if (!state.activeSharedPlan) {
+    return null;
+  }
+
+  const end = state.sharedWordCursor + count;
+  if (end > state.activeSharedPlan.wordIndices.length) {
+    return null;
+  }
+
+  const words = [];
+  for (let i = state.sharedWordCursor; i < end; i += 1) {
+    const wordIndex = state.activeSharedPlan.wordIndices[i];
+    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
+      return null;
+    }
+    const word = wordBank[wordIndex];
+    words.push(word.toUpperCase());
+    state.runWordIndices.push(wordIndex);
+    rememberRecentWord(word);
+  }
+
+  state.sharedWordCursor = end;
+  return words;
 }
 
 function resetKeyboard() {
@@ -878,36 +999,64 @@ function resetKeyboard() {
 }
 
 async function loadLocalWordBank() {
+  let localError = null;
   try {
-    const response = await fetch(LOCAL_WORDS_FILE, { cache: "force-cache" });
-    if (!response.ok) {
-      throw new Error(`Local dictionary request failed (${response.status})`);
-    }
+    const parsed = await loadWordsFromTextFile(LOCAL_WORDS_FILE, "Local");
+    applyLoadedWordBank(parsed, "local");
+    return;
+  } catch (error) {
+    localError = error;
+    console.warn(error);
+  }
 
-    const raw = await response.text();
-    const parsed = sanitizeWords(raw.split(/\r?\n/));
-    if (parsed.length < 1000) {
-      throw new Error("Local dictionary returned too few usable words");
+  try {
+    const parsed = await loadWordsFromTextFile(GITHUB_WORDS_FILE, "GitHub");
+    applyLoadedWordBank(parsed, "github");
+    return;
+  } catch (error) {
+    console.warn(error);
+    if (localError) {
+      console.warn("Both local and GitHub dictionaries failed. Falling back to built-in list.");
     }
-
-    setWordBank(parsed, "local");
-
-    if (state.phase === "pregame") {
-      setPregameSourceText();
-    }
-
-    if (isAtRoundStart()) {
-      state.words = pickRoundWords(ROUND_WORD_COUNT);
-      renderWord();
-      updateStats();
-    }
-
-    if (state.phase === "playing") {
-      setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible. Dictionary: local file (${state.dictionaryWords.toLocaleString()} words).`);
-    }
-  } catch (_error) {
+    state.dictionaryLoadPending = false;
+    readyBtn.disabled = false;
     setWordBank(FALLBACK_WORD_BANK, "fallback");
     setPregameSourceText();
+    if (state.phase === "playing") {
+      setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
+    }
+  }
+}
+
+async function loadWordsFromTextFile(url, sourceName) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`${sourceName} dictionary request failed (${response.status})`);
+  }
+
+  const raw = await response.text();
+  const parsed = sanitizeWords(raw.split(/\r?\n/));
+  if (parsed.length < 1000) {
+    throw new Error(`${sourceName} dictionary returned too few usable words`);
+  }
+
+  return parsed;
+}
+
+function applyLoadedWordBank(words, source) {
+  state.dictionaryLoadPending = false;
+  readyBtn.disabled = false;
+  setWordBank(words, source);
+  setPregameSourceText();
+
+  if (isAtRoundStart()) {
+    state.words = pickRoundWords(state.roundWordCount);
+    renderWord();
+    updateStats();
+  }
+
+  if (state.phase === "playing") {
+    setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
   }
 }
 
@@ -915,16 +1064,37 @@ function setWordBank(words, source) {
   wordBank = words;
   wordsByLength = buildWordsByLength(wordBank);
   availableLengths = Object.keys(wordsByLength).map((len) => Number(len)).sort((a, b) => a - b);
+  wordIndexByWord = buildWordIndexMap(wordBank);
   state.dictionarySource = source;
   state.dictionaryWords = wordBank.length;
 }
 
 function setPregameSourceText() {
-  if (state.dictionarySource === "local") {
-    pregameSource.textContent = `Dictionary: local file (${state.dictionaryWords.toLocaleString()} words)`;
-  } else {
-    pregameSource.textContent = `Dictionary: fallback list (${state.dictionaryWords.toLocaleString()} words)`;
+  if (!pregameSource) {
+    return;
   }
+  if (state.dictionaryLoadPending) {
+    pregameSource.textContent = "Dictionary: loading .txt file...";
+    return;
+  }
+  pregameSource.textContent = `Dictionary: ${getDictionaryDisplayText()}`;
+}
+
+function getDictionarySourceLabel() {
+  if (state.dictionarySource === "local") {
+    return "local .txt file";
+  }
+  if (state.dictionarySource === "github") {
+    return "GitHub .txt file";
+  }
+  return "fallback list";
+}
+
+function getDictionaryDisplayText() {
+  if (state.dictionaryLoadPending) {
+    return "loading .txt file";
+  }
+  return `${getDictionarySourceLabel()} (${state.dictionaryWords.toLocaleString()} words)`;
 }
 
 function isAtRoundStart() {
@@ -1054,12 +1224,144 @@ function sanitizeWords(words) {
     .filter((word) => /^[a-z]+$/.test(word) && word.length >= WORD_MIN_LENGTH && word.length <= WORD_MAX_LENGTH);
 }
 
-function pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred) {
+function buildWordIndexMap(words) {
+  const indexByWord = new Map();
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    if (!indexByWord.has(word)) {
+      indexByWord.set(word, i);
+    }
+  }
+  return indexByWord;
+}
+
+function decodeSharedRunFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const payload = params.get(SHARE_QUERY_KEY);
+  if (!payload) {
+    return null;
+  }
+  return decodeSharedRunPayload(payload);
+}
+
+function decodeSharedRunPayload(rawPayload) {
+  const payload = rawPayload.trim().toLowerCase();
+  const expectedLength = (TARGET_SWAPS * 2) + (SHARE_TOTAL_WORD_COUNT * SHARE_WORD_INDEX_WIDTH);
+  if (payload.length !== expectedLength || !/^[0-9a-z]+$/.test(payload)) {
+    return null;
+  }
+
+  let cursor = 0;
+  const swapPairs = [];
+  for (let i = 0; i < TARGET_SWAPS; i += 1) {
+    const leftIndex = Number.parseInt(payload[cursor], 36);
+    const rightIndex = Number.parseInt(payload[cursor + 1], 36);
+    if (!Number.isInteger(leftIndex) || !Number.isInteger(rightIndex)) {
+      return null;
+    }
+    if (leftIndex < 0 || leftIndex >= ALPHABET.length || rightIndex < 0 || rightIndex >= ALPHABET.length) {
+      return null;
+    }
+
+    const left = ALPHABET[leftIndex];
+    const right = ALPHABET[rightIndex];
+    if (left === right) {
+      return null;
+    }
+
+    swapPairs.push([left, right]);
+    cursor += 2;
+  }
+
+  const wordIndices = [];
+  for (let i = 0; i < SHARE_TOTAL_WORD_COUNT; i += 1) {
+    const chunk = payload.slice(cursor, cursor + SHARE_WORD_INDEX_WIDTH);
+    const wordIndex = Number.parseInt(chunk, 36);
+    if (!Number.isInteger(wordIndex) || wordIndex < 0) {
+      return null;
+    }
+    wordIndices.push(wordIndex);
+    cursor += SHARE_WORD_INDEX_WIDTH;
+  }
+
+  return { payload, swapPairs, wordIndices };
+}
+
+function isSharePlanUsable(plan) {
+  if (!plan) {
+    return false;
+  }
+  if (!Array.isArray(plan.swapPairs) || plan.swapPairs.length !== TARGET_SWAPS) {
+    return false;
+  }
+  if (!Array.isArray(plan.wordIndices) || plan.wordIndices.length !== SHARE_TOTAL_WORD_COUNT) {
+    return false;
+  }
+
+  for (const pair of plan.swapPairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return false;
+    }
+    if (!ALPHABET_INDEX.has(pair[0]) || !ALPHABET_INDEX.has(pair[1]) || pair[0] === pair[1]) {
+      return false;
+    }
+  }
+
+  for (const wordIndex of plan.wordIndices) {
+    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function encodeSharedRun(swapPairs, wordIndices) {
+  if (!Array.isArray(swapPairs) || swapPairs.length !== TARGET_SWAPS) {
+    return "";
+  }
+  if (!Array.isArray(wordIndices) || wordIndices.length !== SHARE_TOTAL_WORD_COUNT) {
+    return "";
+  }
+
+  let encoded = "";
+
+  for (const pair of swapPairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return "";
+    }
+    const leftIndex = ALPHABET_INDEX.get(pair[0]);
+    const rightIndex = ALPHABET_INDEX.get(pair[1]);
+    if (!Number.isInteger(leftIndex) || !Number.isInteger(rightIndex) || leftIndex === rightIndex) {
+      return "";
+    }
+    encoded += leftIndex.toString(36);
+    encoded += rightIndex.toString(36);
+  }
+
+  for (const wordIndex of wordIndices) {
+    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
+      return "";
+    }
+    const token = wordIndex.toString(36);
+    if (token.length > SHARE_WORD_INDEX_WIDTH) {
+      return "";
+    }
+    encoded += token.padStart(SHARE_WORD_INDEX_WIDTH, "0");
+  }
+
+  return encoded;
+}
+
+function pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred, avoidWords, enforceAvoid) {
   const lengthOrder = shuffle([...availableLengths]);
   for (const length of lengthOrder) {
     const pool = poolByLength[length];
     for (const word of pool) {
       if (used.has(word)) {
+        continue;
+      }
+      if (enforceAvoid && avoidWords && avoidWords.has(word)) {
         continue;
       }
       if (mustUsePreferred && preferredSet && !wordHasAnyLetter(word, preferredSet)) {
@@ -1069,6 +1371,18 @@ function pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred) {
     }
   }
   return null;
+}
+
+function rememberRecentWord(word) {
+  const existingIndex = state.recentWords.indexOf(word);
+  if (existingIndex >= 0) {
+    state.recentWords.splice(existingIndex, 1);
+  }
+  state.recentWords.push(word);
+
+  while (state.recentWords.length > RECENT_WORD_MEMORY) {
+    state.recentWords.shift();
+  }
 }
 
 function countWordsContainingAnyLetter(words, letters) {

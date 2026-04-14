@@ -10,37 +10,56 @@
   <div class="app-shell">
     <section id="pregameView" class="card pregame-view">
       <h1>Scramble Typer</h1>
-      <p class="pregame-chip">Timed 5-Swap Challenge</p>
+      <p class="pregame-chip">Timed 3-Swap Challenge</p>
       <p class="pregame-copy">
-        Type 5 words per round. After each round, one nearby key pair swaps. After swap 5, finish one final 5-word round.
+        Type 5 words per round. After each round, one nearby key pair swaps. After swap 3, finish one final 10-word round.
       </p>
       <p class="pregame-copy">
         Timer starts on your first key press. Each swap gets a color so your brain can track mappings faster.
       </p>
-      <p id="pregameSource" class="pregame-source">Dictionary: loading...</p>
       <button id="readyBtn" class="primary-btn" type="button">Ready</button>
     </section>
 
     <section id="gameView" class="hidden">
       <header class="hud card">
         <div class="hud-head">
-          <h2>5-Swap Run</h2>
+          <h2>3-Swap Run</h2>
           <p class="challenge-chip">Sprint</p>
         </div>
         <div class="stats-grid">
           <p><span>Round</span><strong id="roundStat">1</strong></p>
           <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
-          <p><span>Swaps</span><strong id="progressStat">0 / 5</strong></p>
+          <p><span>Swaps</span><strong id="progressStat">0 / 3</strong></p>
           <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
           <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
         </div>
-        <p id="statusLine" class="status-line">Finish 5 swaps as fast as possible.</p>
+        <p id="statusLine" class="status-line">Finish 3 swaps as fast as possible.</p>
+        <div class="swap-track-wrap" aria-label="Swap progress">
+          <div id="swapTrack" class="swap-track">
+            <span id="swapNode1" class="swap-node">1</span>
+            <span class="swap-link"></span>
+            <span id="swapNode2" class="swap-node">2</span>
+            <span class="swap-link"></span>
+            <span id="swapNode3" class="swap-node">3</span>
+            <span class="swap-link"></span>
+            <span id="swapNodeFinish" class="swap-node finish">FIN</span>
+          </div>
+        </div>
         <div id="swapLegend" class="swap-legend"></div>
       </header>
 
       <main class="play card">
         <p class="prompt">Type this word</p>
         <div id="wordDisplay" class="word-display" aria-live="polite"></div>
+        <div class="round-bar-wrap" aria-label="Round progress">
+          <div class="round-bar-head">
+            <p>Round Progress</p>
+            <p id="roundBarText">0%</p>
+          </div>
+          <div class="round-bar-track">
+            <div id="roundBarFill" class="round-bar-fill"></div>
+          </div>
+        </div>
         <div class="play-meta">
           <p id="roundProgress">Word 1 / 5</p>
           <p id="totalWords">0 words complete</p>
