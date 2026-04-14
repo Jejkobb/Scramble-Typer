@@ -10,6 +10,7 @@ const ROW_OFFSETS = [0, 0.5, 1.3];
 const ROUND_WORD_COUNT = 5;
 const PAIR_MIN = 1;
 const PAIR_MAX = 10;
+const MIN_RECENT_SWAP_WORDS_PER_ROUND = 3;
 const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
 const SWAP_WARNING_DURATION = 1300;
@@ -110,6 +111,7 @@ const state = {
   toastTimer: null,
   errorTimer: null,
   swappedLetters: new Set(),
+  recentSwapLetters: new Set(),
   hintToken: null,
   dictionarySource: "fallback",
   dictionaryWords: wordBank.length,
@@ -272,6 +274,7 @@ async function runScramblePhase() {
   state.mode = "scrambling";
   clearHintKey();
   updateStats();
+  const roundRecentSwapLetters = new Set();
 
   const fixedBefore = getFixedSlots().length;
   if (fixedBefore === 0) {
@@ -287,7 +290,7 @@ async function runScramblePhase() {
     if (!pair) {
       break;
     }
-    await animateSwap(pair[0], pair[1]);
+    await animateSwap(pair[0], pair[1], roundRecentSwapLetters);
     updateStats();
   }
 
@@ -297,7 +300,8 @@ async function runScramblePhase() {
   }
 
   state.round += 1;
-  state.words = pickRoundWords(ROUND_WORD_COUNT);
+  state.recentSwapLetters = roundRecentSwapLetters;
+  state.words = pickRoundWords(ROUND_WORD_COUNT, state.recentSwapLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
   state.mode = "playing";
@@ -307,7 +311,7 @@ async function runScramblePhase() {
   setStatus(`Round ${state.round} started. Adapt to the new key map.`);
 }
 
-async function animateSwap(slotA, slotB) {
+async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
   const tokenA = slotIndex.get(slotA);
   const tokenB = slotIndex.get(slotB);
   if (!tokenA || !tokenB || tokenA === tokenB) {
@@ -316,6 +320,10 @@ async function animateSwap(slotA, slotB) {
 
   state.swappedLetters.add(tokenA.letter);
   state.swappedLetters.add(tokenB.letter);
+  if (roundRecentSwapLetters) {
+    roundRecentSwapLetters.add(tokenA.letter);
+    roundRecentSwapLetters.add(tokenB.letter);
+  }
 
   tokenA.el.classList.add("is-swap-target");
   tokenB.el.classList.add("is-swap-target");
@@ -588,29 +596,43 @@ function updateStats() {
   totalWords.textContent = `${state.totalWords} words complete`;
 }
 
-function pickRoundWords(count) {
+function pickRoundWords(count, preferredLetters = null) {
   if (availableLengths.length === 0) {
     return Array.from({ length: count }, () => "TYPE");
   }
 
-  const chosenLengths = [];
-  const cycle = shuffle([...availableLengths]);
-  for (let i = 0; i < count; i += 1) {
-    if (i > 0 && i % cycle.length === 0) {
-      shuffle(cycle);
-    }
-    chosenLengths.push(cycle[i % cycle.length]);
+  const poolByLength = {};
+  for (const length of availableLengths) {
+    poolByLength[length] = shuffle([...wordsByLength[length]]);
   }
-  shuffle(chosenLengths);
 
   const used = new Set();
   const roundWords = [];
-  for (const length of chosenLengths) {
-    const pool = wordsByLength[length];
-    const available = pool.filter((word) => !used.has(word));
-    const chosen = available.length > 0 ? randomChoice(available) : randomChoice(pool);
+  const preferredSet = preferredLetters && preferredLetters.size > 0 ? preferredLetters : null;
+  const targetPreferredCount = preferredSet
+    ? Math.min(MIN_RECENT_SWAP_WORDS_PER_ROUND, count, countWordsContainingAnyLetter(wordBank, preferredSet))
+    : 0;
+
+  let preferredPicked = 0;
+  while (roundWords.length < count) {
+    const mustUsePreferred = preferredPicked < targetPreferredCount;
+    let chosen = pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred);
+    if (!chosen && mustUsePreferred) {
+      chosen = pickWordWithRules(poolByLength, used, preferredSet, false);
+    }
+    if (!chosen) {
+      break;
+    }
+
     roundWords.push(chosen.toUpperCase());
     used.add(chosen);
+    if (preferredSet && wordHasAnyLetter(chosen, preferredSet)) {
+      preferredPicked += 1;
+    }
+  }
+
+  while (roundWords.length < count) {
+    roundWords.push("TYPE");
   }
 
   return roundWords;
@@ -652,6 +674,7 @@ function startNewGame() {
   state.mistakes = 0;
   state.mode = "playing";
   state.swappedLetters.clear();
+  state.recentSwapLetters.clear();
 
   pairsPerRoundInput.value = String(getPairsPerRound());
   restartBtn.classList.add("hidden");
@@ -775,6 +798,42 @@ function sanitizeWords(words) {
   return [...new Set(words)]
     .map((word) => word.trim().toLowerCase())
     .filter((word) => /^[a-z]+$/.test(word) && word.length >= WORD_MIN_LENGTH && word.length <= WORD_MAX_LENGTH);
+}
+
+function pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred) {
+  const lengthOrder = shuffle([...availableLengths]);
+  for (const length of lengthOrder) {
+    const pool = poolByLength[length];
+    for (const word of pool) {
+      if (used.has(word)) {
+        continue;
+      }
+      if (mustUsePreferred && preferredSet && !wordHasAnyLetter(word, preferredSet)) {
+        continue;
+      }
+      return word;
+    }
+  }
+  return null;
+}
+
+function countWordsContainingAnyLetter(words, letters) {
+  let count = 0;
+  for (const word of words) {
+    if (wordHasAnyLetter(word, letters)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function wordHasAnyLetter(word, letters) {
+  for (const letter of letters) {
+    if (word.includes(letter.toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function randomChoice(array) {
