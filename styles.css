@@ -207,18 +207,24 @@ h3 {
 }
 
 .word-display {
+  --word-gap: 0px;
+  --word-join: -1px;
+  --word-pad-x: clamp(8px, 1.7vw, 13px);
+  --word-min-width: clamp(34px, 5.8vw, 46px);
   display: flex;
   flex-wrap: wrap;
-  gap: 0;
+  gap: var(--word-gap);
   min-height: 66px;
   align-items: center;
+  transition: none;
 }
 
 .word-letter {
-  width: clamp(38px, 6.2vw, 52px);
-  height: clamp(48px, 7.3vw, 60px);
+  min-width: var(--word-min-width);
+  height: clamp(46px, 7.1vw, 58px);
+  padding: 0 var(--word-pad-x);
   border-radius: 0;
-  border: 1px solid rgba(171, 207, 221, 0.46);
+  border: 1px solid rgba(102, 141, 154, 0.62);
   display: grid;
   place-items: center;
   font-family: "Space Grotesk", sans-serif;
@@ -228,11 +234,19 @@ h3 {
   color: #f6fcff;
   text-shadow: none;
   background: rgba(255, 255, 255, 0.1);
-  transition: transform 170ms ease, background 170ms ease, border-color 170ms ease;
+  transition:
+    transform 170ms ease,
+    background 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    color 170ms ease,
+    padding 320ms cubic-bezier(0.18, 0.9, 0.24, 1),
+    min-width 320ms cubic-bezier(0.18, 0.9, 0.24, 1);
 }
 
 .word-letter + .word-letter {
-  margin-left: -1px;
+  margin-left: var(--word-join);
+  transition: none;
 }
 
 .word-display .word-letter:first-child {
@@ -243,6 +257,24 @@ h3 {
 .word-display .word-letter:last-child {
   border-top-right-radius: 10px;
   border-bottom-right-radius: 10px;
+}
+
+.word-display.is-pristine {
+  --word-gap: 0px;
+  --word-join: -1px;
+  --word-pad-x: clamp(4px, 0.9vw, 7px);
+  --word-min-width: clamp(27px, 4.5vw, 35px);
+}
+
+.word-display.is-pristine .word-letter {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.word-display.is-pristine .word-letter.was-swapped {
+  border-color: var(--swap-color, rgba(255, 213, 113, 0.72));
+  background: transparent;
 }
 
 .word-letter.typed {
@@ -268,8 +300,8 @@ h3 {
 }
 
 .word-letter.current {
-  border-color: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
+  border-color: rgba(118, 239, 255, 0.92);
+  box-shadow: 0 0 0 2px rgba(122, 236, 255, 0.32);
 }
 
 .word-display.is-error {

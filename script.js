@@ -130,6 +130,7 @@ const state = {
   words: [],
   wordIndex: 0,
   typedIndex: 0,
+  wordVisualPristine: true,
   totalWords: 0,
   swapCount: 0,
   finalRoundActive: false,
@@ -239,6 +240,7 @@ function resetRunState() {
   state.round = 1;
   state.wordIndex = 0;
   state.typedIndex = 0;
+  state.wordVisualPristine = true;
   state.totalWords = 0;
   state.swapCount = 0;
   state.finalRoundActive = false;
@@ -300,9 +302,13 @@ function processTypedLetter(letter) {
   if (!word) {
     return;
   }
+  const shouldRevealWordVisuals = state.wordVisualPristine;
 
   const expected = word[state.typedIndex];
   if (letter !== expected) {
+    if (shouldRevealWordVisuals) {
+      revealWordVisualsIfPristine();
+    }
     state.mistakes += 1;
     updateStats();
     pulseWordError();
@@ -311,6 +317,9 @@ function processTypedLetter(letter) {
 
   state.typedIndex += 1;
   renderWord();
+  if (shouldRevealWordVisuals) {
+    revealWordVisualsIfPristine();
+  }
   if (state.typedIndex === word.length) {
     void completeWord();
   }
@@ -342,6 +351,7 @@ async function completeWord() {
   if (state.wordIndex < ROUND_WORD_COUNT - 1) {
     state.wordIndex += 1;
     state.typedIndex = 0;
+    state.wordVisualPristine = true;
     renderWord();
     updateStats();
     setStatus("Nice rhythm. Keep going.");
@@ -398,6 +408,7 @@ async function runScramblePhase() {
   state.words = pickRoundWords(ROUND_WORD_COUNT, state.recentSwapLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
+  state.wordVisualPristine = true;
   state.phase = "playing";
 
   renderWord();
@@ -700,6 +711,7 @@ function getCurrentWord() {
 function renderWord() {
   const word = getCurrentWord();
   wordDisplay.innerHTML = "";
+  wordDisplay.classList.toggle("is-pristine", state.wordVisualPristine && state.phase === "playing");
 
   for (let i = 0; i < word.length; i += 1) {
     const span = document.createElement("span");
@@ -744,10 +756,21 @@ function startFinalRound(preferredLetters) {
   state.words = pickRoundWords(ROUND_WORD_COUNT, preferredLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
+  state.wordVisualPristine = true;
   state.phase = "playing";
   renderWord();
   updateStats();
   setStatus("Final round. Complete 5 words with all swaps active.");
+}
+
+function revealWordVisualsIfPristine() {
+  if (!state.wordVisualPristine) {
+    return;
+  }
+
+  state.wordVisualPristine = false;
+  void wordDisplay.offsetWidth;
+  wordDisplay.classList.remove("is-pristine");
 }
 
 function applySwapMemory(letterA, letterB, colorIndex) {
