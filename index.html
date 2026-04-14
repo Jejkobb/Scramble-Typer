@@ -8,45 +8,50 @@
 </head>
 <body>
   <div class="app-shell">
-    <header class="hud card">
-      <div class="hud-title-row">
-        <h1>Scramble Typer</h1>
-        <p class="challenge-chip">Timed 5-Swap Challenge</p>
-      </div>
-      <div class="stats-grid">
-        <p><span>Round</span><strong id="roundStat">1</strong></p>
-        <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
-        <p><span id="progressLabel">Swaps</span><strong id="progressStat">0 / 5</strong></p>
-        <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
-        <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
-      </div>
-      <p id="statusLine" class="status-line">Finish 5 swaps as fast as you can.</p>
-    </header>
+    <section id="pregameView" class="card pregame-view">
+      <h1>Scramble Typer</h1>
+      <p class="pregame-chip">Timed 5-Swap Challenge</p>
+      <p class="pregame-copy">
+        Type 5 words per round. After each round, one nearby key pair swaps. Finish when you survive 5 swaps.
+      </p>
+      <p class="pregame-copy">
+        Timer starts on your first key press.
+      </p>
+      <p id="pregameSource" class="pregame-source">Dictionary: loading...</p>
+      <button id="readyBtn" class="primary-btn" type="button">Ready</button>
+    </section>
 
-    <main class="play card">
-      <p class="prompt">Type this word</p>
-      <div id="wordDisplay" class="word-display" aria-live="polite"></div>
-      <div class="play-meta">
-        <p id="roundProgress">Word 1 / 5</p>
-        <p id="totalWords">0 words complete</p>
-      </div>
-      <button id="restartBtn" class="restart-btn hidden" type="button">Restart</button>
-      <div id="sharePanel" class="share-panel hidden">
-        <p id="resultSummary" class="result-summary"></p>
-        <textarea id="shareText" class="share-text" rows="3" readonly></textarea>
-        <div class="share-actions">
-          <button id="copyScoreBtn" class="share-btn" type="button">Copy Score</button>
-          <button id="nativeShareBtn" class="share-btn secondary hidden" type="button">Share</button>
+    <section id="gameView" class="hidden">
+      <header class="hud card">
+        <div class="hud-head">
+          <h2>5-Swap Run</h2>
+          <p class="challenge-chip">Sprint</p>
         </div>
-        <p id="copyStatus" class="copy-status"></p>
-      </div>
-    </main>
+        <div class="stats-grid">
+          <p><span>Round</span><strong id="roundStat">1</strong></p>
+          <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
+          <p><span>Swaps</span><strong id="progressStat">0 / 5</strong></p>
+          <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
+          <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
+        </div>
+        <p id="statusLine" class="status-line">Finish 5 swaps as fast as possible.</p>
+      </header>
 
-    <section id="keyboardDock" aria-label="Keyboard">
-      <div id="keyboardStage">
-        <div id="swapBeam" aria-hidden="true"></div>
-      </div>
-      <p id="swapToast" class="swap-toast" aria-live="assertive"></p>
+      <main class="play card">
+        <p class="prompt">Type this word</p>
+        <div id="wordDisplay" class="word-display" aria-live="polite"></div>
+        <div class="play-meta">
+          <p id="roundProgress">Word 1 / 5</p>
+          <p id="totalWords">0 words complete</p>
+        </div>
+      </main>
+
+      <section id="keyboardDock" aria-label="Keyboard">
+        <div id="keyboardStage">
+          <div id="swapBeam" aria-hidden="true"></div>
+        </div>
+        <p id="swapToast" class="swap-toast" aria-live="assertive"></p>
+      </section>
     </section>
   </div>
 
@@ -60,6 +65,22 @@
         <span id="overlayKeyA" class="preview-key">A</span>
         <span class="preview-arrow"><-></span>
         <span id="overlayKeyB" class="preview-key">B</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="finishModal" class="finish-modal hidden" aria-live="polite">
+    <div class="finish-card">
+      <h3>Challenge Complete</h3>
+      <p id="finishSummary" class="finish-summary"></p>
+      <div class="finish-stats">
+        <p><span>Time</span><strong id="finishTime">00:00.0</strong></p>
+        <p><span>Mistakes</span><strong id="finishMistakes">0</strong></p>
+        <p><span>Words</span><strong id="finishWords">0</strong></p>
+      </div>
+      <div class="finish-actions">
+        <button id="copyScoreBtn" class="primary-btn" type="button">Share Score</button>
+        <button id="playAgainBtn" class="secondary-btn" type="button">Play Again</button>
       </div>
     </div>
   </div>

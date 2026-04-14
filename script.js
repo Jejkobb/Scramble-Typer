@@ -10,17 +10,20 @@ const ROW_OFFSETS = [0, 0.5, 1.3];
 const ROUND_WORD_COUNT = 5;
 const SWAPS_PER_ROUND = 1;
 const MIN_RECENT_SWAP_WORDS_PER_ROUND = 3;
-const SPRINT_TARGET_SWAPS = 5;
+const TARGET_SWAPS = 5;
 const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
+
 const SWAP_WARNING_DURATION = 1300;
 const SWAP_WARNING_FADE_GAP = 220;
 const SWAP_PREPARE_DURATION = 340;
 const SWAP_TRAVEL_DURATION = 860;
 const SWAP_SETTLE_DURATION = 320;
 const SWAP_END_GAP = 120;
+
 const SWAP_NEAR_DISTANCE = 1.8;
 const SWAP_EXPANDED_DISTANCE = 2.6;
+const COPY_FEEDBACK_DURATION = 1800;
 const LOCAL_WORDS_FILE = "./words_alpha.txt";
 
 const BASE_WORD_BANK = [
@@ -80,34 +83,41 @@ let wordBank = [...FALLBACK_WORD_BANK];
 let wordsByLength = buildWordsByLength(wordBank);
 let availableLengths = Object.keys(wordsByLength).map((len) => Number(len)).sort((a, b) => a - b);
 
-const keyboardStage = document.getElementById("keyboardStage");
-const swapBeam = document.getElementById("swapBeam");
-const swapToast = document.getElementById("swapToast");
-const swapOverlay = document.getElementById("swapOverlay");
-const overlayKeyA = document.getElementById("overlayKeyA");
-const overlayKeyB = document.getElementById("overlayKeyB");
-const wordDisplay = document.getElementById("wordDisplay");
+const pregameView = document.getElementById("pregameView");
+const pregameSource = document.getElementById("pregameSource");
+const readyBtn = document.getElementById("readyBtn");
+
+const gameView = document.getElementById("gameView");
 const roundStat = document.getElementById("roundStat");
 const wordStat = document.getElementById("wordStat");
-const progressLabel = document.getElementById("progressLabel");
 const progressStat = document.getElementById("progressStat");
 const mistakeStat = document.getElementById("mistakeStat");
 const timeStat = document.getElementById("timeStat");
 const statusLine = document.getElementById("statusLine");
 const roundProgress = document.getElementById("roundProgress");
 const totalWords = document.getElementById("totalWords");
-const restartBtn = document.getElementById("restartBtn");
-const sharePanel = document.getElementById("sharePanel");
-const resultSummary = document.getElementById("resultSummary");
-const shareText = document.getElementById("shareText");
+const wordDisplay = document.getElementById("wordDisplay");
+
+const keyboardStage = document.getElementById("keyboardStage");
+const swapBeam = document.getElementById("swapBeam");
+const swapToast = document.getElementById("swapToast");
+const swapOverlay = document.getElementById("swapOverlay");
+const overlayKeyA = document.getElementById("overlayKeyA");
+const overlayKeyB = document.getElementById("overlayKeyB");
+
+const finishModal = document.getElementById("finishModal");
+const finishSummary = document.getElementById("finishSummary");
+const finishTime = document.getElementById("finishTime");
+const finishMistakes = document.getElementById("finishMistakes");
+const finishWords = document.getElementById("finishWords");
 const copyScoreBtn = document.getElementById("copyScoreBtn");
-const nativeShareBtn = document.getElementById("nativeShareBtn");
-const copyStatus = document.getElementById("copyStatus");
+const playAgainBtn = document.getElementById("playAgainBtn");
 
 const tokens = [];
 const slotIndex = new Map();
 
 const state = {
+  phase: "pregame", // pregame | playing | scrambling | finished
   round: 1,
   words: [],
   wordIndex: 0,
@@ -115,7 +125,6 @@ const state = {
   totalWords: 0,
   swapCount: 0,
   mistakes: 0,
-  mode: "playing",
   toastTimer: null,
   errorTimer: null,
   timerInterval: null,
@@ -127,11 +136,13 @@ const state = {
   hintToken: null,
   dictionarySource: "fallback",
   dictionaryWords: wordBank.length,
+  shareText: "",
+  copyResetTimer: null,
 };
 
 createKeyboard();
 bindEvents();
-startNewGame();
+enterPregame();
 void loadLocalWordBank();
 
 function buildSlotLayout() {
@@ -165,7 +176,7 @@ function createKeyboard() {
     token.button.textContent = letter;
     token.button.setAttribute("aria-label", `Type ${letter}`);
     token.button.addEventListener("click", () => {
-      if (state.mode !== "playing") {
+      if (state.phase !== "playing") {
         return;
       }
       activateToken(token);
@@ -183,21 +194,63 @@ function createKeyboard() {
 
 function bindEvents() {
   document.addEventListener("keydown", onKeyDown);
-  restartBtn.addEventListener("click", startNewGame);
+  readyBtn.addEventListener("click", startChallenge);
+  playAgainBtn.addEventListener("click", startChallenge);
   copyScoreBtn.addEventListener("click", copyShareScore);
-  nativeShareBtn.addEventListener("click", shareScoreNatively);
-  if (navigator.share) {
-    nativeShareBtn.classList.remove("hidden");
-  }
+}
+
+function enterPregame() {
+  state.phase = "pregame";
+  gameView.classList.add("hidden");
+  finishModal.classList.add("hidden");
+  pregameView.classList.remove("hidden");
+  setPregameSourceText();
+}
+
+function startChallenge() {
+  resetRunState();
+  pregameView.classList.add("hidden");
+  finishModal.classList.add("hidden");
+  gameView.classList.remove("hidden");
+
+  state.phase = "playing";
+  state.words = pickRoundWords(ROUND_WORD_COUNT);
+  state.wordIndex = 0;
+  state.typedIndex = 0;
+
+  resetKeyboard();
+  renderWord();
+  updateStats();
+  setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible. Dictionary: ${state.dictionarySource}.`);
+}
+
+function resetRunState() {
+  state.round = 1;
+  state.wordIndex = 0;
+  state.typedIndex = 0;
+  state.totalWords = 0;
+  state.swapCount = 0;
+  state.mistakes = 0;
+  state.words = [];
+  state.swappedLetters.clear();
+  state.recentSwapLetters.clear();
+  state.shareText = "";
+
+  clearTimeout(state.copyResetTimer);
+  state.copyResetTimer = null;
+  copyScoreBtn.textContent = "Share Score";
+
+  resetTimer();
 }
 
 function onKeyDown(event) {
-  if (state.mode !== "playing") {
+  if (state.phase !== "playing") {
     return;
   }
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
+
   const pressed = event.key.toUpperCase();
   if (!/^[A-Z]$/.test(pressed)) {
     return;
@@ -208,6 +261,7 @@ function onKeyDown(event) {
   if (!token) {
     return;
   }
+
   activateToken(token);
   processTypedLetter(token.letter);
 }
@@ -221,7 +275,7 @@ function activateToken(token) {
 }
 
 function processTypedLetter(letter) {
-  if (state.mode !== "playing") {
+  if (state.phase !== "playing") {
     return;
   }
 
@@ -258,7 +312,7 @@ function pulseWordError() {
 }
 
 async function completeWord() {
-  if (state.mode !== "playing") {
+  if (state.phase !== "playing") {
     return;
   }
 
@@ -283,24 +337,24 @@ async function completeWord() {
 }
 
 async function runScramblePhase() {
-  state.mode = "scrambling";
+  state.phase = "scrambling";
   clearHintKey();
   updateStats();
   const roundRecentSwapLetters = new Set();
 
-  if (state.swapCount >= SPRINT_TARGET_SWAPS) {
-    finishGame();
+  if (state.swapCount >= TARGET_SWAPS) {
+    finishChallenge();
     return;
   }
 
-  const remainingForGoal = SPRINT_TARGET_SWAPS - state.swapCount;
-  const swapsThisRound = Math.max(0, Math.min(SWAPS_PER_ROUND, remainingForGoal));
+  const remaining = TARGET_SWAPS - state.swapCount;
+  const swapsThisRound = Math.max(0, Math.min(SWAPS_PER_ROUND, remaining));
   if (swapsThisRound === 0) {
-    finishGame();
+    finishChallenge();
     return;
   }
 
-  setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remainingForGoal} swap${remainingForGoal === 1 ? "" : "s"} left).`);
+  setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remaining} swap${remaining === 1 ? "" : "s"} left).`);
 
   for (let step = 1; step <= swapsThisRound; step += 1) {
     const pair = pickProgressSwapPair();
@@ -312,8 +366,8 @@ async function runScramblePhase() {
     updateStats();
   }
 
-  if (state.swapCount >= SPRINT_TARGET_SWAPS) {
-    finishGame();
+  if (state.swapCount >= TARGET_SWAPS) {
+    finishChallenge();
     return;
   }
 
@@ -322,11 +376,64 @@ async function runScramblePhase() {
   state.words = pickRoundWords(ROUND_WORD_COUNT, state.recentSwapLetters);
   state.wordIndex = 0;
   state.typedIndex = 0;
-  state.mode = "playing";
+  state.phase = "playing";
 
   renderWord();
   updateStats();
-  setStatus(`Round ${state.round} started. Reach ${SPRINT_TARGET_SWAPS} total swaps as fast as possible.`);
+  setStatus(`Round ${state.round} started. Reach ${TARGET_SWAPS} total swaps as fast as possible.`);
+}
+
+function finishChallenge() {
+  state.phase = "finished";
+  clearHintKey();
+  stopTimer();
+
+  const finalTime = formatElapsedMs(state.elapsedMs);
+  setStatus(`Challenge complete: ${TARGET_SWAPS} swaps in ${finalTime}.`);
+  showSwapToast(`Clear in ${finalTime}.`);
+
+  finishTime.textContent = finalTime;
+  finishMistakes.textContent = String(state.mistakes);
+  finishWords.textContent = String(state.totalWords);
+  finishSummary.textContent = `You completed 5 swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
+
+  state.shareText = buildShareText();
+  copyScoreBtn.textContent = "Share Score";
+  finishModal.classList.remove("hidden");
+  updateStats();
+}
+
+function buildShareText() {
+  const finalTime = formatElapsedMs(state.elapsedMs);
+  const link = `${window.location.origin}${window.location.pathname}`;
+  return `I finished Scramble Typer (5-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
+}
+
+async function copyShareScore() {
+  if (!state.shareText) {
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(state.shareText);
+    } else {
+      const ghost = document.createElement("textarea");
+      ghost.value = state.shareText;
+      document.body.appendChild(ghost);
+      ghost.select();
+      document.execCommand("copy");
+      document.body.removeChild(ghost);
+    }
+
+    copyScoreBtn.textContent = "Copied to Clipboard";
+    clearTimeout(state.copyResetTimer);
+    state.copyResetTimer = setTimeout(() => {
+      copyScoreBtn.textContent = "Share Score";
+    }, COPY_FEEDBACK_DURATION);
+  } catch (_error) {
+    copyScoreBtn.textContent = "Copy Failed";
+  }
 }
 
 async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
@@ -425,7 +532,6 @@ function pickProgressSwapPair() {
     return expandedFixedToDisplaced;
   }
 
-  // Last-resort nearest fixed -> displaced swap to prevent deadlock.
   return pickNearestFixedToDisplaced(fixed, displaced);
 }
 
@@ -463,7 +569,6 @@ function pickNearbyPair(leftSlots, rightSlots, maxDistance, uniquePair) {
     return null;
   }
 
-  // Prefer physically closer swaps for a clearer, local scrambling feel.
   const weighted = [];
   for (const candidate of candidates) {
     const weight = 1 / (candidate.distance + 0.2);
@@ -585,9 +690,10 @@ function renderWord() {
 
     if (i < state.typedIndex) {
       span.classList.add("typed");
-    } else if (i === state.typedIndex && state.mode === "playing") {
+    } else if (i === state.typedIndex && state.phase === "playing") {
       span.classList.add("current");
     }
+
     wordDisplay.appendChild(span);
   }
 
@@ -599,10 +705,9 @@ function renderWord() {
 function updateStats() {
   roundStat.textContent = String(state.round);
   wordStat.textContent = `${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
-  progressLabel.textContent = "Swaps";
-  progressStat.textContent = `${state.swapCount} / ${SPRINT_TARGET_SWAPS}`;
-  timeStat.textContent = formatElapsedMs(getElapsedMs());
+  progressStat.textContent = `${state.swapCount} / ${TARGET_SWAPS}`;
   mistakeStat.textContent = String(state.mistakes);
+  timeStat.textContent = formatElapsedMs(getElapsedMs());
   roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
   totalWords.textContent = `${state.totalWords} words complete`;
 }
@@ -667,42 +772,6 @@ function resetKeyboard() {
   rebuildSlotIndex();
 }
 
-function finishGame() {
-  state.mode = "finished";
-  clearHintKey();
-  stopTimer();
-  const finalTime = formatElapsedMs(state.elapsedMs);
-  setStatus(`Challenge complete: ${SPRINT_TARGET_SWAPS} swaps in ${finalTime}.`);
-  showSwapToast(`Clear in ${finalTime}.`);
-  showSharePanel();
-  restartBtn.classList.remove("hidden");
-  updateStats();
-}
-
-function startNewGame() {
-  state.round = 1;
-  state.words = pickRoundWords(ROUND_WORD_COUNT);
-  state.wordIndex = 0;
-  state.typedIndex = 0;
-  state.totalWords = 0;
-  state.swapCount = 0;
-  state.mistakes = 0;
-  state.mode = "playing";
-  state.swappedLetters.clear();
-  state.recentSwapLetters.clear();
-  resetTimer();
-
-  restartBtn.classList.add("hidden");
-  sharePanel.classList.add("hidden");
-  copyStatus.textContent = "";
-  shareText.value = "";
-  resultSummary.textContent = "";
-  resetKeyboard();
-  renderWord();
-  updateStats();
-  setStatus(`Finish ${SPRINT_TARGET_SWAPS} swaps as fast as possible. Source: ${state.dictionarySource}.`);
-}
-
 async function loadLocalWordBank() {
   try {
     const response = await fetch(LOCAL_WORDS_FILE, { cache: "force-cache" });
@@ -718,19 +787,22 @@ async function loadLocalWordBank() {
 
     setWordBank(parsed, "local");
 
+    if (state.phase === "pregame") {
+      setPregameSourceText();
+    }
+
     if (isAtRoundStart()) {
       state.words = pickRoundWords(ROUND_WORD_COUNT);
-      state.wordIndex = 0;
-      state.typedIndex = 0;
       renderWord();
       updateStats();
     }
 
-    if (state.mode === "playing") {
-      setStatus(`Finish ${SPRINT_TARGET_SWAPS} swaps as fast as possible. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
+    if (state.phase === "playing") {
+      setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible. Dictionary: local file (${state.dictionaryWords.toLocaleString()} words).`);
     }
   } catch (_error) {
     setWordBank(FALLBACK_WORD_BANK, "fallback");
+    setPregameSourceText();
   }
 }
 
@@ -742,8 +814,16 @@ function setWordBank(words, source) {
   state.dictionaryWords = wordBank.length;
 }
 
+function setPregameSourceText() {
+  if (state.dictionarySource === "local") {
+    pregameSource.textContent = `Dictionary: local file (${state.dictionaryWords.toLocaleString()} words)`;
+  } else {
+    pregameSource.textContent = `Dictionary: fallback list (${state.dictionaryWords.toLocaleString()} words)`;
+  }
+}
+
 function isAtRoundStart() {
-  return state.mode === "playing"
+  return state.phase === "playing"
     && state.round === 1
     && state.totalWords === 0
     && state.wordIndex === 0
@@ -756,7 +836,7 @@ function clearWordFeedback() {
 }
 
 function startTimerIfNeeded() {
-  if (state.timerStarted || state.mode !== "playing") {
+  if (state.timerStarted || state.phase !== "playing") {
     return;
   }
   state.timerStarted = true;
@@ -805,55 +885,10 @@ function formatElapsedMs(ms) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
 }
 
-function showSharePanel() {
-  const finalTime = formatElapsedMs(state.elapsedMs);
-  const link = window.location.href;
-  const message = `I finished Scramble Typer 5-Swap Challenge in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat me? ${link}`;
-  resultSummary.textContent = `Final time: ${finalTime}. Mistakes: ${state.mistakes}.`;
-  shareText.value = message;
-  sharePanel.classList.remove("hidden");
-}
-
-async function copyShareScore() {
-  const text = shareText.value.trim();
-  if (!text) {
-    return;
-  }
-
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      shareText.focus();
-      shareText.select();
-      document.execCommand("copy");
-    }
-    copyStatus.textContent = "Score copied to clipboard.";
-  } catch (_error) {
-    copyStatus.textContent = "Could not copy automatically. You can copy the text manually.";
-  }
-}
-
-async function shareScoreNatively() {
-  if (!navigator.share || !shareText.value.trim()) {
-    return;
-  }
-
-  try {
-    await navigator.share({
-      title: "Scramble Typer Score",
-      text: shareText.value,
-      url: window.location.href,
-    });
-  } catch (_error) {
-    // User cancellation is a normal outcome.
-  }
-}
-
 function updateNextKeyHint() {
   clearHintKey();
 
-  if (state.mode !== "playing") {
+  if (state.phase !== "playing") {
     return;
   }
 
@@ -948,10 +983,6 @@ function wordHasAnyLetter(word, letters) {
     }
   }
   return false;
-}
-
-function randomChoice(array) {
-  return array[Math.floor(Math.random() * array.length)];
 }
 
 function weightedRandomByWeight(items) {
