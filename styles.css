@@ -174,6 +174,24 @@ h3 {
   font-size: 0.84rem;
 }
 
+.swap-legend {
+  margin-top: 8px;
+  min-height: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.swap-pill {
+  border-radius: 999px;
+  border: 1px solid var(--swap-color, rgba(255, 255, 255, 0.25));
+  background: var(--swap-color-soft, rgba(255, 255, 255, 0.08));
+  color: #ecf7fb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
 .play {
   padding: 14px;
   display: grid;
@@ -218,10 +236,10 @@ h3 {
 }
 
 .word-letter.was-swapped {
-  border-color: rgba(255, 213, 113, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(255, 219, 124, 0.24);
-  background: rgba(255, 213, 113, 0.12);
-  color: #fff0bf;
+  border-color: var(--swap-color, rgba(255, 213, 113, 0.72));
+  box-shadow: inset 0 0 0 1px var(--swap-color-soft, rgba(255, 219, 124, 0.24));
+  background: var(--swap-color-soft, rgba(255, 213, 113, 0.12));
+  color: #fff3cb;
 }
 
 .word-letter.was-swapped.typed {
@@ -335,6 +353,14 @@ h3 {
   background:
     linear-gradient(180deg, rgba(145, 255, 225, 0.54), rgba(128, 233, 208, 0.2)),
     linear-gradient(155deg, #3f6466, #2d4f54);
+}
+
+.key-token.has-swap-color .keycap {
+  border-color: var(--swap-color, rgba(255, 213, 113, 0.7));
+  box-shadow:
+    0 8px 0 #141d22,
+    0 11px 17px rgba(0, 0, 0, 0.36),
+    0 0 0 2px var(--swap-color-soft, rgba(255, 213, 113, 0.22));
 }
 
 .key-token.is-next-target .keycap {

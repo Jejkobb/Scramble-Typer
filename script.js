@@ -25,6 +25,13 @@ const SWAP_NEAR_DISTANCE = 1.8;
 const SWAP_EXPANDED_DISTANCE = 2.6;
 const COPY_FEEDBACK_DURATION = 1800;
 const LOCAL_WORDS_FILE = "./words_alpha.txt";
+const SWAP_COLOR_PALETTE = [
+  { solid: "#ff7b72", soft: "rgba(255, 123, 114, 0.24)" },
+  { solid: "#6ecbff", soft: "rgba(110, 203, 255, 0.24)" },
+  { solid: "#89f0a8", soft: "rgba(137, 240, 168, 0.24)" },
+  { solid: "#ffd166", soft: "rgba(255, 209, 102, 0.24)" },
+  { solid: "#c59bff", soft: "rgba(197, 155, 255, 0.24)" },
+];
 
 const BASE_WORD_BANK = [
   "about", "above", "adapt", "agent", "angle", "apple", "arena", "badge", "basic", "beach",
@@ -94,6 +101,7 @@ const progressStat = document.getElementById("progressStat");
 const mistakeStat = document.getElementById("mistakeStat");
 const timeStat = document.getElementById("timeStat");
 const statusLine = document.getElementById("statusLine");
+const swapLegend = document.getElementById("swapLegend");
 const roundProgress = document.getElementById("roundProgress");
 const totalWords = document.getElementById("totalWords");
 const wordDisplay = document.getElementById("wordDisplay");
@@ -124,6 +132,7 @@ const state = {
   typedIndex: 0,
   totalWords: 0,
   swapCount: 0,
+  finalRoundActive: false,
   mistakes: 0,
   toastTimer: null,
   errorTimer: null,
@@ -133,6 +142,8 @@ const state = {
   elapsedMs: 0,
   swappedLetters: new Set(),
   recentSwapLetters: new Set(),
+  swapColorByLetter: new Map(),
+  swapHistory: [],
   hintToken: null,
   dictionarySource: "fallback",
   dictionaryWords: wordBank.length,
@@ -230,15 +241,19 @@ function resetRunState() {
   state.typedIndex = 0;
   state.totalWords = 0;
   state.swapCount = 0;
+  state.finalRoundActive = false;
   state.mistakes = 0;
   state.words = [];
   state.swappedLetters.clear();
   state.recentSwapLetters.clear();
+  state.swapColorByLetter.clear();
+  state.swapHistory = [];
   state.shareText = "";
 
   clearTimeout(state.copyResetTimer);
   state.copyResetTimer = null;
   copyScoreBtn.textContent = "Share Score";
+  updateSwapLegend();
 
   resetTimer();
 }
@@ -333,6 +348,11 @@ async function completeWord() {
     return;
   }
 
+  if (state.finalRoundActive) {
+    finishChallenge();
+    return;
+  }
+
   await runScramblePhase();
 }
 
@@ -343,14 +363,14 @@ async function runScramblePhase() {
   const roundRecentSwapLetters = new Set();
 
   if (state.swapCount >= TARGET_SWAPS) {
-    finishChallenge();
+    startFinalRound(state.recentSwapLetters);
     return;
   }
 
   const remaining = TARGET_SWAPS - state.swapCount;
   const swapsThisRound = Math.max(0, Math.min(SWAPS_PER_ROUND, remaining));
   if (swapsThisRound === 0) {
-    finishChallenge();
+    startFinalRound(state.recentSwapLetters);
     return;
   }
 
@@ -361,13 +381,15 @@ async function runScramblePhase() {
     if (!pair) {
       break;
     }
-    await animateSwap(pair[0], pair[1], roundRecentSwapLetters);
+    const colorIndex = state.swapCount % SWAP_COLOR_PALETTE.length;
+    await animateSwap(pair[0], pair[1], roundRecentSwapLetters, colorIndex);
     state.swapCount += 1;
     updateStats();
   }
 
   if (state.swapCount >= TARGET_SWAPS) {
-    finishChallenge();
+    state.recentSwapLetters = roundRecentSwapLetters;
+    startFinalRound(state.recentSwapLetters);
     return;
   }
 
@@ -436,7 +458,7 @@ async function copyShareScore() {
   }
 }
 
-async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
+async function animateSwap(slotA, slotB, roundRecentSwapLetters = null, colorIndex = 0) {
   const tokenA = slotIndex.get(slotA);
   const tokenB = slotIndex.get(slotB);
   if (!tokenA || !tokenB || tokenA === tokenB) {
@@ -445,6 +467,7 @@ async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
 
   state.swappedLetters.add(tokenA.letter);
   state.swappedLetters.add(tokenB.letter);
+  applySwapMemory(tokenA.letter, tokenB.letter, colorIndex);
   if (roundRecentSwapLetters) {
     roundRecentSwapLetters.add(tokenA.letter);
     roundRecentSwapLetters.add(tokenB.letter);
@@ -684,7 +707,10 @@ function renderWord() {
     const letter = word[i];
     span.textContent = letter;
 
-    if (state.swappedLetters.has(letter)) {
+    if (state.swapColorByLetter.has(letter)) {
+      const color = getSwapColor(state.swapColorByLetter.get(letter));
+      span.style.setProperty("--swap-color", color.solid);
+      span.style.setProperty("--swap-color-soft", color.soft);
       span.classList.add("was-swapped");
     }
 
@@ -710,6 +736,60 @@ function updateStats() {
   timeStat.textContent = formatElapsedMs(getElapsedMs());
   roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
   totalWords.textContent = `${state.totalWords} words complete`;
+}
+
+function startFinalRound(preferredLetters) {
+  state.finalRoundActive = true;
+  state.round += 1;
+  state.words = pickRoundWords(ROUND_WORD_COUNT, preferredLetters);
+  state.wordIndex = 0;
+  state.typedIndex = 0;
+  state.phase = "playing";
+  renderWord();
+  updateStats();
+  setStatus("Final round. Complete 5 words with all swaps active.");
+}
+
+function applySwapMemory(letterA, letterB, colorIndex) {
+  state.swapColorByLetter.set(letterA, colorIndex);
+  state.swapColorByLetter.set(letterB, colorIndex);
+  state.swapHistory.push({
+    number: state.swapCount + 1,
+    pair: `${letterA}<->${letterB}`,
+    colorIndex,
+  });
+
+  applyTokenColorForLetter(letterA, colorIndex);
+  applyTokenColorForLetter(letterB, colorIndex);
+  updateSwapLegend();
+}
+
+function applyTokenColorForLetter(letter, colorIndex) {
+  const token = getTokenByLetter(letter);
+  if (!token) {
+    return;
+  }
+  const color = getSwapColor(colorIndex);
+  token.el.classList.add("has-swap-color");
+  token.el.style.setProperty("--swap-color", color.solid);
+  token.el.style.setProperty("--swap-color-soft", color.soft);
+}
+
+function getSwapColor(index) {
+  return SWAP_COLOR_PALETTE[index % SWAP_COLOR_PALETTE.length];
+}
+
+function updateSwapLegend() {
+  swapLegend.innerHTML = "";
+  for (const entry of state.swapHistory) {
+    const pill = document.createElement("span");
+    pill.className = "swap-pill";
+    const color = getSwapColor(entry.colorIndex);
+    pill.style.setProperty("--swap-color", color.solid);
+    pill.style.setProperty("--swap-color-soft", color.soft);
+    pill.textContent = `#${entry.number} ${entry.pair}`;
+    swapLegend.appendChild(pill);
+  }
 }
 
 function pickRoundWords(count, preferredLetters = null) {
@@ -765,7 +845,9 @@ function resetKeyboard() {
 
   for (const token of tokens) {
     token.slot = token.letter;
-    token.el.classList.remove("is-pressed", "is-swap-target", "settle", "is-next-target");
+    token.el.classList.remove("is-pressed", "is-swap-target", "settle", "is-next-target", "has-swap-color");
+    token.el.style.removeProperty("--swap-color");
+    token.el.style.removeProperty("--swap-color-soft");
     placeToken(token, false);
   }
   state.hintToken = null;

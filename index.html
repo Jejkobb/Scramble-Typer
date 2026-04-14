@@ -12,10 +12,10 @@
       <h1>Scramble Typer</h1>
       <p class="pregame-chip">Timed 5-Swap Challenge</p>
       <p class="pregame-copy">
-        Type 5 words per round. After each round, one nearby key pair swaps. Finish when you survive 5 swaps.
+        Type 5 words per round. After each round, one nearby key pair swaps. After swap 5, finish one final 5-word round.
       </p>
       <p class="pregame-copy">
-        Timer starts on your first key press.
+        Timer starts on your first key press. Each swap gets a color so your brain can track mappings faster.
       </p>
       <p id="pregameSource" class="pregame-source">Dictionary: loading...</p>
       <button id="readyBtn" class="primary-btn" type="button">Ready</button>
@@ -35,6 +35,7 @@
           <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
         </div>
         <p id="statusLine" class="status-line">Finish 5 swaps as fast as possible.</p>
+        <div id="swapLegend" class="swap-legend"></div>
       </header>
 
       <main class="play card">
