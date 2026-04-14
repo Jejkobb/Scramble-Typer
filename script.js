@@ -6,11 +6,16 @@ const KEY_ROWS = [
   ["Z", "X", "C", "V", "B", "N", "M"],
 ];
 
+const GAME_MODES = {
+  ENDLESS: "endless",
+  SPRINT: "sprint",
+};
 const ROW_OFFSETS = [0, 0.5, 1.3];
 const ROUND_WORD_COUNT = 5;
 const PAIR_MIN = 1;
 const PAIR_MAX = 10;
 const MIN_RECENT_SWAP_WORDS_PER_ROUND = 3;
+const SPRINT_TARGET_SWAPS = 5;
 const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
 const SWAP_WARNING_DURATION = 1300;
@@ -87,11 +92,14 @@ const swapOverlay = document.getElementById("swapOverlay");
 const overlayKeyA = document.getElementById("overlayKeyA");
 const overlayKeyB = document.getElementById("overlayKeyB");
 const wordDisplay = document.getElementById("wordDisplay");
+const gameModeSelect = document.getElementById("gameMode");
 const pairsPerRoundInput = document.getElementById("pairsPerRound");
 const roundStat = document.getElementById("roundStat");
 const wordStat = document.getElementById("wordStat");
-const homeKeysStat = document.getElementById("homeKeysStat");
+const progressLabel = document.getElementById("progressLabel");
+const progressStat = document.getElementById("progressStat");
 const mistakeStat = document.getElementById("mistakeStat");
+const timeStat = document.getElementById("timeStat");
 const statusLine = document.getElementById("statusLine");
 const roundProgress = document.getElementById("roundProgress");
 const totalWords = document.getElementById("totalWords");
@@ -101,15 +109,21 @@ const tokens = [];
 const slotIndex = new Map();
 
 const state = {
+  gameMode: GAME_MODES.ENDLESS,
   round: 1,
   words: [],
   wordIndex: 0,
   typedIndex: 0,
   totalWords: 0,
+  swapCount: 0,
   mistakes: 0,
   mode: "playing",
   toastTimer: null,
   errorTimer: null,
+  timerInterval: null,
+  timerStarted: false,
+  timerStartMs: 0,
+  elapsedMs: 0,
   swappedLetters: new Set(),
   recentSwapLetters: new Set(),
   hintToken: null,
@@ -171,6 +185,9 @@ function createKeyboard() {
 
 function bindEvents() {
   document.addEventListener("keydown", onKeyDown);
+  gameModeSelect.addEventListener("change", () => {
+    startNewGame();
+  });
   pairsPerRoundInput.addEventListener("change", () => {
     pairsPerRoundInput.value = String(getPairsPerRound());
   });
@@ -184,7 +201,7 @@ function onKeyDown(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
-  if (event.target === pairsPerRoundInput) {
+  if (event.target === pairsPerRoundInput || event.target === gameModeSelect) {
     return;
   }
 
@@ -214,6 +231,8 @@ function processTypedLetter(letter) {
   if (state.mode !== "playing") {
     return;
   }
+
+  startTimerIfNeeded();
 
   const word = getCurrentWord();
   if (!word) {
@@ -276,14 +295,35 @@ async function runScramblePhase() {
   updateStats();
   const roundRecentSwapLetters = new Set();
 
-  const fixedBefore = getFixedSlots().length;
-  if (fixedBefore === 0) {
+  if (isSprintMode() && state.swapCount >= SPRINT_TARGET_SWAPS) {
     finishGame();
     return;
   }
 
-  const swapsThisRound = Math.min(getPairsPerRound(), Math.ceil(fixedBefore / 2));
-  setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"}...`);
+  const fixedBefore = getFixedSlots().length;
+  if (!isSprintMode() && fixedBefore === 0) {
+    finishGame();
+    return;
+  }
+
+  const fixedLimit = isSprintMode()
+    ? getPairsPerRound()
+    : Math.ceil(fixedBefore / 2);
+  const remainingForGoal = isSprintMode()
+    ? SPRINT_TARGET_SWAPS - state.swapCount
+    : Number.POSITIVE_INFINITY;
+  const swapsThisRound = Math.max(0, Math.min(getPairsPerRound(), fixedLimit, remainingForGoal));
+  if (swapsThisRound === 0) {
+    finishGame();
+    return;
+  }
+
+  const remainingAfterRound = isSprintMode() ? (SPRINT_TARGET_SWAPS - state.swapCount) : null;
+  if (isSprintMode()) {
+    setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remainingAfterRound} swap${remainingAfterRound === 1 ? "" : "s"} left).`);
+  } else {
+    setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"}...`);
+  }
 
   for (let step = 1; step <= swapsThisRound; step += 1) {
     const pair = pickProgressSwapPair();
@@ -291,10 +331,16 @@ async function runScramblePhase() {
       break;
     }
     await animateSwap(pair[0], pair[1], roundRecentSwapLetters);
+    state.swapCount += 1;
     updateStats();
   }
 
-  if (getFixedSlots().length === 0) {
+  if (isSprintMode() && state.swapCount >= SPRINT_TARGET_SWAPS) {
+    finishGame();
+    return;
+  }
+
+  if (!isSprintMode() && getFixedSlots().length === 0) {
     finishGame();
     return;
   }
@@ -308,7 +354,11 @@ async function runScramblePhase() {
 
   renderWord();
   updateStats();
-  setStatus(`Round ${state.round} started. Adapt to the new key map.`);
+  if (isSprintMode()) {
+    setStatus(`Round ${state.round} started. Reach ${SPRINT_TARGET_SWAPS} total swaps as fast as possible.`);
+  } else {
+    setStatus(`Round ${state.round} started. Adapt to the new key map.`);
+  }
 }
 
 async function animateSwap(slotA, slotB, roundRecentSwapLetters = null) {
@@ -590,7 +640,15 @@ function renderWord() {
 function updateStats() {
   roundStat.textContent = String(state.round);
   wordStat.textContent = `${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
-  homeKeysStat.textContent = String(getFixedSlots().length);
+  if (isSprintMode()) {
+    progressLabel.textContent = "Swaps";
+    progressStat.textContent = `${state.swapCount} / ${SPRINT_TARGET_SWAPS}`;
+    timeStat.textContent = formatElapsedMs(getElapsedMs());
+  } else {
+    progressLabel.textContent = "Home Keys Left";
+    progressStat.textContent = String(getFixedSlots().length);
+    timeStat.textContent = "--:--.-";
+  }
   mistakeStat.textContent = String(state.mistakes);
   roundProgress.textContent = `Word ${Math.min(state.wordIndex + 1, ROUND_WORD_COUNT)} / ${ROUND_WORD_COUNT}`;
   totalWords.textContent = `${state.totalWords} words complete`;
@@ -659,29 +717,43 @@ function resetKeyboard() {
 function finishGame() {
   state.mode = "finished";
   clearHintKey();
-  setStatus("Keyboard fully scrambled. Every key has moved from home.");
-  showSwapToast("Fully scrambled. Challenge complete.");
+  stopTimer();
+  if (isSprintMode()) {
+    const finalTime = formatElapsedMs(state.elapsedMs);
+    setStatus(`Sprint complete: ${SPRINT_TARGET_SWAPS} swaps in ${finalTime}.`);
+    showSwapToast(`Sprint clear in ${finalTime}.`);
+  } else {
+    setStatus("Keyboard fully scrambled. Every key has moved from home.");
+    showSwapToast("Fully scrambled. Challenge complete.");
+  }
   restartBtn.classList.remove("hidden");
   updateStats();
 }
 
 function startNewGame() {
+  state.gameMode = gameModeSelect.value === GAME_MODES.SPRINT ? GAME_MODES.SPRINT : GAME_MODES.ENDLESS;
   state.round = 1;
   state.words = pickRoundWords(ROUND_WORD_COUNT);
   state.wordIndex = 0;
   state.typedIndex = 0;
   state.totalWords = 0;
+  state.swapCount = 0;
   state.mistakes = 0;
   state.mode = "playing";
   state.swappedLetters.clear();
   state.recentSwapLetters.clear();
+  resetTimer();
 
   pairsPerRoundInput.value = String(getPairsPerRound());
   restartBtn.classList.add("hidden");
   resetKeyboard();
   renderWord();
   updateStats();
-  setStatus(`Type the word below. Every 5 words, keys swap places. Source: ${state.dictionarySource}.`);
+  if (isSprintMode()) {
+    setStatus(`Sprint mode: reach ${SPRINT_TARGET_SWAPS} swaps fast. Source: ${state.dictionarySource}.`);
+  } else {
+    setStatus(`Type the word below. Every 5 words, keys swap places. Source: ${state.dictionarySource}.`);
+  }
 }
 
 async function loadLocalWordBank() {
@@ -708,7 +780,11 @@ async function loadLocalWordBank() {
     }
 
     if (state.mode === "playing") {
-      setStatus(`Type the word below. Every 5 words, keys swap places. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
+      if (isSprintMode()) {
+        setStatus(`Sprint mode: reach ${SPRINT_TARGET_SWAPS} swaps fast. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
+      } else {
+        setStatus(`Type the word below. Every 5 words, keys swap places. Source: local file (${state.dictionaryWords.toLocaleString()} words).`);
+      }
     }
   } catch (_error) {
     setWordBank(FALLBACK_WORD_BANK, "fallback");
@@ -734,6 +810,60 @@ function isAtRoundStart() {
 function clearWordFeedback() {
   wordDisplay.classList.remove("is-error");
   wordDisplay.classList.remove("is-complete");
+}
+
+function startTimerIfNeeded() {
+  if (!isSprintMode() || state.timerStarted || state.mode !== "playing") {
+    return;
+  }
+  state.timerStarted = true;
+  state.timerStartMs = performance.now();
+  state.timerInterval = setInterval(() => {
+    timeStat.textContent = formatElapsedMs(getElapsedMs());
+  }, 100);
+}
+
+function stopTimer() {
+  if (state.timerStarted) {
+    state.elapsedMs = getElapsedMs();
+  }
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  state.timerStarted = false;
+  timeStat.textContent = formatElapsedMs(state.elapsedMs);
+}
+
+function resetTimer() {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  state.timerStarted = false;
+  state.timerStartMs = 0;
+  state.elapsedMs = 0;
+  timeStat.textContent = formatElapsedMs(0);
+}
+
+function getElapsedMs() {
+  if (state.timerStarted) {
+    return Math.max(0, performance.now() - state.timerStartMs);
+  }
+  return Math.max(0, state.elapsedMs);
+}
+
+function formatElapsedMs(ms) {
+  const safe = Math.max(0, ms);
+  const totalSeconds = Math.floor(safe / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const tenths = Math.floor((safe % 1000) / 100);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
+}
+
+function isSprintMode() {
+  return state.gameMode === GAME_MODES.SPRINT;
 }
 
 function updateNextKeyHint() {

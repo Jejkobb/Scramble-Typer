@@ -11,16 +11,26 @@
     <header class="hud card">
       <div class="hud-title-row">
         <h1>Scramble Typer</h1>
-        <label class="pairs-control" for="pairsPerRound">
-          <span>Swaps / round</span>
-          <input id="pairsPerRound" type="number" min="1" max="10" value="1" inputmode="numeric">
-        </label>
+        <div class="hud-controls">
+          <label class="mode-control" for="gameMode">
+            <span>Mode</span>
+            <select id="gameMode">
+              <option value="endless">Endless</option>
+              <option value="sprint">5-Swap Sprint</option>
+            </select>
+          </label>
+          <label class="pairs-control" for="pairsPerRound">
+            <span>Swaps / round</span>
+            <input id="pairsPerRound" type="number" min="1" max="10" value="1" inputmode="numeric">
+          </label>
+        </div>
       </div>
       <div class="stats-grid">
         <p><span>Round</span><strong id="roundStat">1</strong></p>
         <p><span>Word</span><strong id="wordStat">1 / 5</strong></p>
-        <p><span>Home Keys Left</span><strong id="homeKeysStat">26</strong></p>
+        <p><span id="progressLabel">Home Keys Left</span><strong id="progressStat">26</strong></p>
         <p><span>Mistakes</span><strong id="mistakeStat">0</strong></p>
+        <p><span>Time</span><strong id="timeStat">00:00.0</strong></p>
       </div>
       <p id="statusLine" class="status-line">Type the word below. Every 5 words, keys swap places.</p>
     </header>

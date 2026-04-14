@@ -61,6 +61,14 @@ body {
   gap: 10px;
 }
 
+.hud-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 h1 {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
@@ -68,6 +76,7 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+.mode-control,
 .pairs-control {
   display: inline-flex;
   align-items: center;
@@ -76,6 +85,7 @@ h1 {
   color: var(--muted);
 }
 
+.mode-control select,
 .pairs-control input {
   width: 58px;
   border-radius: 9px;
@@ -88,6 +98,14 @@ h1 {
   padding: 6px 4px;
 }
 
+.mode-control select {
+  width: 132px;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.mode-control select:focus,
 .pairs-control input:focus {
   outline: 2px solid rgba(141, 247, 217, 0.66);
   outline-offset: 1px;
@@ -96,7 +114,7 @@ h1 {
 .stats-grid {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -142,21 +160,22 @@ h1 {
 .word-display {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  min-height: 66px;
+  gap: clamp(4px, 0.9vw, 6px);
+  min-height: 54px;
   align-items: center;
+  align-content: center;
 }
 
 .word-letter {
-  width: clamp(38px, 6.3vw, 52px);
-  height: clamp(46px, 7.2vw, 60px);
-  border-radius: 11px;
+  width: clamp(32px, 5.3vw, 44px);
+  height: clamp(40px, 6.2vw, 52px);
+  border-radius: 10px;
   border: 1px solid rgba(151, 188, 201, 0.24);
   display: grid;
   place-items: center;
   font-family: "Space Grotesk", sans-serif;
   font-weight: 700;
-  font-size: clamp(1.05rem, 3vw, 1.4rem);
+  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
   background: rgba(255, 255, 255, 0.04);
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
@@ -577,6 +596,16 @@ h1 {
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hud-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hud-controls {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .play-meta {
