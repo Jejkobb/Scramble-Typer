@@ -15,9 +15,7 @@ const TARGET_SWAPS = 3;
 const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
 const RECENT_WORD_MEMORY = 140;
-const SHARE_QUERY_KEY = "g";
-const SHARE_WORD_INDEX_WIDTH = 3;
-const SHARE_TOTAL_WORD_COUNT = (BASE_ROUND_WORD_COUNT * TARGET_SWAPS) + FINAL_ROUND_WORD_COUNT;
+const SEED_QUERY_KEY = "seed";
 
 const SWAP_WARNING_DURATION = 1650;
 const SWAP_WARNING_FADE_GAP = 320;
@@ -47,17 +45,18 @@ const FALLBACK_WORD_BANK = sanitizeWords([
 ]);
 
 const ALPHABET = KEY_ROWS.flat();
-const ALPHABET_INDEX = new Map(ALPHABET.map((letter, index) => [letter, index]));
 const SLOT_LAYOUT = buildSlotLayout();
-const SHARE_TEMPLATE = decodeSharedRunFromUrl();
+const DAILY_SEED = buildDailySeedString();
+const URL_SEED = readSeedFromUrl();
+const INITIAL_SEED = URL_SEED || DAILY_SEED;
+const INITIAL_GAME_MODE = URL_SEED ? "random" : "daily";
 
 let wordBank = [...FALLBACK_WORD_BANK];
 let wordsByLength = buildWordsByLength(wordBank);
 let availableLengths = Object.keys(wordsByLength).map((len) => Number(len)).sort((a, b) => a - b);
-let wordIndexByWord = buildWordIndexMap(wordBank);
-
 const pregameView = document.getElementById("pregameView");
-const pregameSource = document.getElementById("pregameSource");
+const dailyModeBtn = document.getElementById("dailyModeBtn");
+const randomModeBtn = document.getElementById("randomModeBtn");
 const readyBtn = document.getElementById("readyBtn");
 
 const gameView = document.getElementById("gameView");
@@ -123,11 +122,10 @@ const state = {
   dictionarySource: "fallback",
   dictionaryWords: wordBank.length,
   recentWords: [],
-  sharedTemplate: SHARE_TEMPLATE,
-  activeSharedPlan: null,
-  sharedWordCursor: 0,
-  runWordIndices: [],
-  runSwapPairs: [],
+  gameMode: INITIAL_GAME_MODE, // daily | random
+  seedLockedToUrl: URL_SEED.length > 0,
+  seed: INITIAL_SEED,
+  rng: createSeededRng(INITIAL_SEED),
   shareText: "",
   copyResetTimer: null,
 };
@@ -186,6 +184,16 @@ function createKeyboard() {
 
 function bindEvents() {
   document.addEventListener("keydown", onKeyDown);
+  if (dailyModeBtn) {
+    dailyModeBtn.addEventListener("click", () => {
+      setGameMode("daily");
+    });
+  }
+  if (randomModeBtn) {
+    randomModeBtn.addEventListener("click", () => {
+      setGameMode("random");
+    });
+  }
   readyBtn.addEventListener("click", startChallenge);
   playAgainBtn.addEventListener("click", startChallenge);
   copyScoreBtn.addEventListener("click", copyShareScore);
@@ -197,9 +205,9 @@ function enterPregame() {
   finishModal.classList.add("hidden");
   pregameView.classList.remove("hidden");
   readyBtn.disabled = state.dictionaryLoadPending;
+  updateGameModeUI();
   updateRoundBar();
   updateSwapTrack();
-  setPregameSourceText();
 }
 
 function startChallenge() {
@@ -211,8 +219,8 @@ function startChallenge() {
   pregameView.classList.add("hidden");
   finishModal.classList.add("hidden");
   gameView.classList.remove("hidden");
-
-  state.activeSharedPlan = isSharePlanUsable(state.sharedTemplate) ? state.sharedTemplate : null;
+  state.seed = resolveSeedForNextRun();
+  state.rng = createSeededRng(state.seed);
 
   state.phase = "playing";
   state.roundWordCount = BASE_ROUND_WORD_COUNT;
@@ -224,6 +232,41 @@ function startChallenge() {
   renderWord();
   updateStats();
   setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
+}
+
+function setGameMode(mode) {
+  if (mode !== "daily" && mode !== "random") {
+    return;
+  }
+  state.gameMode = mode;
+  // User selection should override any shared-link seed lock.
+  state.seedLockedToUrl = false;
+  updateGameModeUI();
+}
+
+function updateGameModeUI() {
+  if (dailyModeBtn) {
+    const selected = state.gameMode === "daily";
+    dailyModeBtn.classList.toggle("is-selected", selected);
+    dailyModeBtn.setAttribute("aria-pressed", String(selected));
+  }
+  if (randomModeBtn) {
+    const selected = state.gameMode === "random";
+    randomModeBtn.classList.toggle("is-selected", selected);
+    randomModeBtn.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+function resolveSeedForNextRun() {
+  if (state.gameMode === "daily") {
+    return buildDailySeedString();
+  }
+
+  if (state.seedLockedToUrl && URL_SEED) {
+    return URL_SEED;
+  }
+
+  return generateRandomSeed();
 }
 
 function resetRunState() {
@@ -242,10 +285,7 @@ function resetRunState() {
   state.swapColorByLetter.clear();
   state.swapHistory = [];
   state.recentWords = [];
-  state.activeSharedPlan = null;
-  state.sharedWordCursor = 0;
-  state.runWordIndices = [];
-  state.runSwapPairs = [];
+  state.rng = createSeededRng(state.seed);
   state.shareText = "";
 
   clearTimeout(state.copyResetTimer);
@@ -383,11 +423,10 @@ async function runScramblePhase() {
   setStatus(`Round clear. Scrambling ${swapsThisRound} pair${swapsThisRound === 1 ? "" : "s"} (${remaining} swap${remaining === 1 ? "" : "s"} left).`);
 
   for (let step = 1; step <= swapsThisRound; step += 1) {
-    const pair = getNextSwapPair();
+    const pair = pickProgressSwapPair();
     if (!pair) {
       break;
     }
-    state.runSwapPairs.push([pair[0], pair[1]]);
     const upcomingSwapNumber = state.swapCount + 1;
     if (upcomingSwapNumber === TARGET_SWAPS) {
       setStatus("Final swap incoming. Get ready.");
@@ -445,9 +484,9 @@ function finishChallenge() {
 
 function buildShareText() {
   const finalTime = formatElapsedMs(state.elapsedMs);
-  const payload = encodeSharedRun(state.runSwapPairs, state.runWordIndices);
   const baseLink = `${window.location.origin}${window.location.pathname}`;
-  const link = payload ? `${baseLink}?${SHARE_QUERY_KEY}=${payload}` : baseLink;
+  const encodedSeed = encodeURIComponent(state.seed);
+  const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
   return `I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
 }
 
@@ -653,16 +692,6 @@ function getSlotDistance(slotA, slotB) {
   const a = SLOT_LAYOUT[slotA];
   const b = SLOT_LAYOUT[slotB];
   return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function getNextSwapPair() {
-  if (state.activeSharedPlan) {
-    const plannedPair = state.activeSharedPlan.swapPairs[state.swapCount];
-    if (plannedPair) {
-      return [plannedPair[0], plannedPair[1]];
-    }
-  }
-  return pickProgressSwapPair();
 }
 
 function placeToken(token, animate) {
@@ -894,11 +923,6 @@ function updateSwapLegend() {
 }
 
 function pickRoundWords(count, preferredLetters = null) {
-  const plannedWords = pickSharedRoundWords(count);
-  if (plannedWords) {
-    return plannedWords;
-  }
-
   if (availableLengths.length === 0) {
     return Array.from({ length: count }, () => "TYPE");
   }
@@ -935,10 +959,6 @@ function pickRoundWords(count, preferredLetters = null) {
 
     roundWords.push(chosen.toUpperCase());
     used.add(chosen);
-    const chosenIndex = wordIndexByWord.get(chosen);
-    if (Number.isInteger(chosenIndex)) {
-      state.runWordIndices.push(chosenIndex);
-    }
     rememberRecentWord(chosen);
     if (preferredSet && wordHasAnyLetter(chosen, preferredSet)) {
       preferredPicked += 1;
@@ -950,32 +970,6 @@ function pickRoundWords(count, preferredLetters = null) {
   }
 
   return roundWords;
-}
-
-function pickSharedRoundWords(count) {
-  if (!state.activeSharedPlan) {
-    return null;
-  }
-
-  const end = state.sharedWordCursor + count;
-  if (end > state.activeSharedPlan.wordIndices.length) {
-    return null;
-  }
-
-  const words = [];
-  for (let i = state.sharedWordCursor; i < end; i += 1) {
-    const wordIndex = state.activeSharedPlan.wordIndices[i];
-    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
-      return null;
-    }
-    const word = wordBank[wordIndex];
-    words.push(word.toUpperCase());
-    state.runWordIndices.push(wordIndex);
-    rememberRecentWord(word);
-  }
-
-  state.sharedWordCursor = end;
-  return words;
 }
 
 function resetKeyboard() {
@@ -1021,7 +1015,6 @@ async function loadLocalWordBank() {
     state.dictionaryLoadPending = false;
     readyBtn.disabled = false;
     setWordBank(FALLBACK_WORD_BANK, "fallback");
-    setPregameSourceText();
     if (state.phase === "playing") {
       setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
     }
@@ -1047,7 +1040,6 @@ function applyLoadedWordBank(words, source) {
   state.dictionaryLoadPending = false;
   readyBtn.disabled = false;
   setWordBank(words, source);
-  setPregameSourceText();
 
   if (isAtRoundStart()) {
     state.words = pickRoundWords(state.roundWordCount);
@@ -1064,37 +1056,8 @@ function setWordBank(words, source) {
   wordBank = words;
   wordsByLength = buildWordsByLength(wordBank);
   availableLengths = Object.keys(wordsByLength).map((len) => Number(len)).sort((a, b) => a - b);
-  wordIndexByWord = buildWordIndexMap(wordBank);
   state.dictionarySource = source;
   state.dictionaryWords = wordBank.length;
-}
-
-function setPregameSourceText() {
-  if (!pregameSource) {
-    return;
-  }
-  if (state.dictionaryLoadPending) {
-    pregameSource.textContent = "Dictionary: loading .txt file...";
-    return;
-  }
-  pregameSource.textContent = `Dictionary: ${getDictionaryDisplayText()}`;
-}
-
-function getDictionarySourceLabel() {
-  if (state.dictionarySource === "local") {
-    return "local .txt file";
-  }
-  if (state.dictionarySource === "github") {
-    return "GitHub .txt file";
-  }
-  return "fallback list";
-}
-
-function getDictionaryDisplayText() {
-  if (state.dictionaryLoadPending) {
-    return "loading .txt file";
-  }
-  return `${getDictionarySourceLabel()} (${state.dictionaryWords.toLocaleString()} words)`;
 }
 
 function isAtRoundStart() {
@@ -1201,7 +1164,7 @@ function getTokenByLetter(letter) {
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(randomFloat() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
@@ -1224,133 +1187,61 @@ function sanitizeWords(words) {
     .filter((word) => /^[a-z]+$/.test(word) && word.length >= WORD_MIN_LENGTH && word.length <= WORD_MAX_LENGTH);
 }
 
-function buildWordIndexMap(words) {
-  const indexByWord = new Map();
-  for (let i = 0; i < words.length; i += 1) {
-    const word = words[i];
-    if (!indexByWord.has(word)) {
-      indexByWord.set(word, i);
-    }
-  }
-  return indexByWord;
+function buildDailySeedString() {
+  // UTC date keeps daily mode globally consistent for all players.
+  return new Date().toISOString().slice(0, 10);
 }
 
-function decodeSharedRunFromUrl() {
+function readSeedFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const payload = params.get(SHARE_QUERY_KEY);
-  if (!payload) {
-    return null;
-  }
-  return decodeSharedRunPayload(payload);
+  const rawSeed = params.get(SEED_QUERY_KEY);
+  return normalizeSeed(rawSeed);
 }
 
-function decodeSharedRunPayload(rawPayload) {
-  const payload = rawPayload.trim().toLowerCase();
-  const expectedLength = (TARGET_SWAPS * 2) + (SHARE_TOTAL_WORD_COUNT * SHARE_WORD_INDEX_WIDTH);
-  if (payload.length !== expectedLength || !/^[0-9a-z]+$/.test(payload)) {
-    return null;
-  }
-
-  let cursor = 0;
-  const swapPairs = [];
-  for (let i = 0; i < TARGET_SWAPS; i += 1) {
-    const leftIndex = Number.parseInt(payload[cursor], 36);
-    const rightIndex = Number.parseInt(payload[cursor + 1], 36);
-    if (!Number.isInteger(leftIndex) || !Number.isInteger(rightIndex)) {
-      return null;
-    }
-    if (leftIndex < 0 || leftIndex >= ALPHABET.length || rightIndex < 0 || rightIndex >= ALPHABET.length) {
-      return null;
-    }
-
-    const left = ALPHABET[leftIndex];
-    const right = ALPHABET[rightIndex];
-    if (left === right) {
-      return null;
-    }
-
-    swapPairs.push([left, right]);
-    cursor += 2;
-  }
-
-  const wordIndices = [];
-  for (let i = 0; i < SHARE_TOTAL_WORD_COUNT; i += 1) {
-    const chunk = payload.slice(cursor, cursor + SHARE_WORD_INDEX_WIDTH);
-    const wordIndex = Number.parseInt(chunk, 36);
-    if (!Number.isInteger(wordIndex) || wordIndex < 0) {
-      return null;
-    }
-    wordIndices.push(wordIndex);
-    cursor += SHARE_WORD_INDEX_WIDTH;
-  }
-
-  return { payload, swapPairs, wordIndices };
-}
-
-function isSharePlanUsable(plan) {
-  if (!plan) {
-    return false;
-  }
-  if (!Array.isArray(plan.swapPairs) || plan.swapPairs.length !== TARGET_SWAPS) {
-    return false;
-  }
-  if (!Array.isArray(plan.wordIndices) || plan.wordIndices.length !== SHARE_TOTAL_WORD_COUNT) {
-    return false;
-  }
-
-  for (const pair of plan.swapPairs) {
-    if (!Array.isArray(pair) || pair.length !== 2) {
-      return false;
-    }
-    if (!ALPHABET_INDEX.has(pair[0]) || !ALPHABET_INDEX.has(pair[1]) || pair[0] === pair[1]) {
-      return false;
-    }
-  }
-
-  for (const wordIndex of plan.wordIndices) {
-    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function encodeSharedRun(swapPairs, wordIndices) {
-  if (!Array.isArray(swapPairs) || swapPairs.length !== TARGET_SWAPS) {
+function normalizeSeed(seed) {
+  if (!seed) {
     return "";
   }
-  if (!Array.isArray(wordIndices) || wordIndices.length !== SHARE_TOTAL_WORD_COUNT) {
-    return "";
+  return String(seed).trim().slice(0, 80);
+}
+
+function generateRandomSeed() {
+  const prefix = `rnd-${Date.now().toString(36)}`;
+  if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(6);
+    window.crypto.getRandomValues(bytes);
+    const randomChunk = Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("");
+    return `${prefix}-${randomChunk}`;
   }
 
-  let encoded = "";
+  const fallbackChunk = Math.floor(Math.random() * 1e12).toString(36);
+  return `${prefix}-${fallbackChunk}`;
+}
 
-  for (const pair of swapPairs) {
-    if (!Array.isArray(pair) || pair.length !== 2) {
-      return "";
-    }
-    const leftIndex = ALPHABET_INDEX.get(pair[0]);
-    const rightIndex = ALPHABET_INDEX.get(pair[1]);
-    if (!Number.isInteger(leftIndex) || !Number.isInteger(rightIndex) || leftIndex === rightIndex) {
-      return "";
-    }
-    encoded += leftIndex.toString(36);
-    encoded += rightIndex.toString(36);
+function createSeededRng(seedString) {
+  let t = hashSeedToUint32(seedString || "scramble-typer");
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashSeedToUint32(seedString) {
+  let hash = 2166136261;
+  for (let i = 0; i < seedString.length; i += 1) {
+    hash ^= seedString.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
   }
+  return hash >>> 0;
+}
 
-  for (const wordIndex of wordIndices) {
-    if (!Number.isInteger(wordIndex) || wordIndex < 0 || wordIndex >= wordBank.length) {
-      return "";
-    }
-    const token = wordIndex.toString(36);
-    if (token.length > SHARE_WORD_INDEX_WIDTH) {
-      return "";
-    }
-    encoded += token.padStart(SHARE_WORD_INDEX_WIDTH, "0");
+function randomFloat() {
+  if (typeof state.rng === "function") {
+    return state.rng();
   }
-
-  return encoded;
+  return Math.random();
 }
 
 function pickWordWithRules(poolByLength, used, preferredSet, mustUsePreferred, avoidWords, enforceAvoid) {
@@ -1410,7 +1301,7 @@ function weightedRandomByWeight(items) {
     total += item.weight;
   }
 
-  let roll = Math.random() * total;
+  let roll = randomFloat() * total;
   for (const item of items) {
     roll -= item.weight;
     if (roll <= 0) {

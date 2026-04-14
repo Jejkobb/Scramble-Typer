@@ -12,12 +12,23 @@
       <h1>Scramble Typer</h1>
       <p class="pregame-chip">Timed 3-Swap Challenge</p>
       <p class="pregame-copy">
-        Type 5 words per round. After each round, one nearby key pair swaps. After swap 3, finish one final 10-word round.
+        Type 5 words. Keys swap 3 times. Then finish with a final 10-word sprint.
+      </p>
+      <p class="mode-title">Choose A Mode</p>
+      <p class="pregame-copy">
+        Daily: everyone gets the same challenge today.
+      </p>
+      <div class="mode-picker" role="group" aria-label="Game mode">
+        <button id="dailyModeBtn" class="mode-btn is-selected" type="button" aria-pressed="true">Daily</button>
+        <button id="randomModeBtn" class="mode-btn" type="button" aria-pressed="false">Random</button>
+      </div>
+      <p class="pregame-copy">
+        Random: get a fresh challenge. If you share your score link, friends play the same one.
       </p>
       <p class="pregame-copy">
-        Timer starts on your first key press. Each swap gets a color so your brain can track mappings faster.
+        Timer starts when you type your first key.
       </p>
-      <button id="readyBtn" class="primary-btn" type="button">Ready</button>
+      <button id="readyBtn" class="primary-btn" type="button">Start</button>
     </section>
 
     <section id="gameView" class="hidden">

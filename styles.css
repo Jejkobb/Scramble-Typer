@@ -100,10 +100,43 @@ h3 {
   font-size: 0.94rem;
 }
 
-.pregame-source {
+.mode-title {
   margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
+  color: #cfe4ec;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mode-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mode-btn {
+  border: 1px solid rgba(132, 171, 184, 0.5);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #dff0f7;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px);
+}
+
+.mode-btn.is-selected {
+  border-color: rgba(141, 247, 217, 0.8);
+  background: rgba(141, 247, 217, 0.2);
+  color: #d7fff2;
 }
 
 .primary-btn,
