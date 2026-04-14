@@ -209,22 +209,25 @@ h3 {
 .word-display {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(4px, 0.9vw, 6px);
-  min-height: 54px;
+  gap: clamp(6px, 1.1vw, 8px);
+  min-height: 66px;
   align-items: center;
 }
 
 .word-letter {
-  width: clamp(30px, 5.1vw, 42px);
-  height: clamp(38px, 6vw, 50px);
-  border-radius: 9px;
-  border: 1px solid rgba(151, 188, 201, 0.24);
+  width: clamp(36px, 5.9vw, 48px);
+  height: clamp(46px, 7vw, 58px);
+  border-radius: 10px;
+  border: 1px solid rgba(171, 207, 221, 0.46);
   display: grid;
   place-items: center;
   font-family: "Space Grotesk", sans-serif;
-  font-weight: 700;
-  font-size: clamp(0.94rem, 2.3vw, 1.16rem);
-  background: rgba(255, 255, 255, 0.04);
+  font-weight: 800;
+  font-size: clamp(1.08rem, 2.9vw, 1.38rem);
+  letter-spacing: 0.01em;
+  color: #f2fbff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.08);
   transition: transform 170ms ease, background 170ms ease, border-color 170ms ease;
 }
 
@@ -252,7 +255,7 @@ h3 {
 
 .word-letter.current {
   border-color: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 
 .word-display.is-error {
