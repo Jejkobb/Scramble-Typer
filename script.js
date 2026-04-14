@@ -26,7 +26,7 @@ const SWAP_EXPANDED_DISTANCE = 2.6;
 const COPY_FEEDBACK_DURATION = 1800;
 const LOCAL_WORDS_FILE = "./words_alpha.txt";
 const SWAP_COLOR_PALETTE = [
-  { solid: "#ff7b72", soft: "rgba(255, 123, 114, 0.24)" },
+  { solid: "#54d2a0", soft: "rgba(84, 210, 160, 0.24)" },
   { solid: "#6ecbff", soft: "rgba(110, 203, 255, 0.24)" },
   { solid: "#89f0a8", soft: "rgba(137, 240, 168, 0.24)" },
   { solid: "#ffd166", soft: "rgba(255, 209, 102, 0.24)" },
