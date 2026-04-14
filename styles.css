@@ -224,7 +224,7 @@ h3 {
   height: clamp(46px, 7.1vw, 58px);
   padding: 0 var(--word-pad-x);
   border-radius: 0;
-  border: 1px solid rgba(102, 141, 154, 0.62);
+  border: 1px solid transparent;
   display: grid;
   place-items: center;
   font-family: "Space Grotesk", sans-serif;
@@ -277,6 +277,17 @@ h3 {
   background: transparent;
 }
 
+.word-display.is-pristine .word-letter.current {
+  border-color: transparent;
+  box-shadow: none;
+  animation: none;
+  transform: none;
+}
+
+.word-display.is-pristine .word-letter.was-swapped.current {
+  border-color: var(--swap-color, rgba(255, 213, 113, 0.72));
+}
+
 .word-letter.typed {
   background: #2ecc71;
   border-color: #54d88c;
@@ -300,8 +311,18 @@ h3 {
 }
 
 .word-letter.current {
-  border-color: rgba(118, 239, 255, 0.92);
-  box-shadow: 0 0 0 2px rgba(122, 236, 255, 0.32);
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 -3px 0 rgba(233, 246, 252, 0.76);
+  animation: currentLetterFocus 620ms ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+.word-letter.was-swapped.current {
+  border-color: var(--swap-color, rgba(255, 213, 113, 0.72));
+  box-shadow:
+    inset 0 0 0 1px var(--swap-color-soft, rgba(255, 219, 124, 0.24)),
+    inset 0 -3px 0 rgba(233, 246, 252, 0.72);
 }
 
 .word-display.is-error {
@@ -652,6 +673,19 @@ h3 {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes currentLetterFocus {
+  from {
+    transform: translateY(0);
+    padding-left: calc(var(--word-pad-x) - 0.5px);
+    padding-right: calc(var(--word-pad-x) - 0.5px);
+  }
+  to {
+    transform: translateY(-2px);
+    padding-left: calc(var(--word-pad-x) + 1.5px);
+    padding-right: calc(var(--word-pad-x) + 1.5px);
   }
 }
 
