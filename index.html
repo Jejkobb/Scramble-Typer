@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Scramble Typer</title>
+  <meta name="description" content="&#x2328;&#xFE0F;&#x1F500; Scramble Typer: race through the daily keyboard scramble, track your streak, and challenge friends.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Scramble Typer">
+  <meta property="og:url" content="https://jejkobb.github.io/Scramble-Typer/">
+  <meta property="og:title" content="&#x2328;&#xFE0F; Scramble Typer Daily Challenge">
+  <meta property="og:description" content="&#x1F500; Keys keep swapping. Finish today's scramble fast and compare streaks with friends.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="&#x2328;&#xFE0F; Scramble Typer Daily Challenge">
+  <meta name="twitter:description" content="&#x1F525; Type fast, survive the swaps, and keep your daily streak alive.">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,6 +37,7 @@
       <p class="pregame-copy">
         Timer starts when you type your first key.
       </p>
+      <p id="pregameWarning" class="pregame-warning hidden" aria-live="polite"></p>
       <button id="readyBtn" class="primary-btn" type="button">Start</button>
     </section>
 
@@ -105,10 +115,21 @@
       <h3 id="finishTitle">Challenge Complete</h3>
       <p id="dailyCompletionNote" class="daily-completion-note hidden"></p>
       <p id="finishSummary" class="finish-summary"></p>
-      <div class="finish-stats">
+      <div id="finishStatsPanel" class="finish-stats">
         <p><span>Time</span><strong id="finishTime">00:00.0</strong></p>
         <p><span>Mistakes</span><strong id="finishMistakes">0</strong></p>
         <p><span>Words</span><strong id="finishWords">0</strong></p>
+      </div>
+      <div id="dailySummaryPanel" class="daily-summary-panel hidden">
+        <p id="dailyHeroTime" class="daily-hero-time">00:00.0</p>
+        <p id="dailyHeroLabel" class="daily-hero-label">Scramble #1 (15.4.2026)</p>
+        <p class="daily-section-title">Statistics</p>
+        <div class="daily-overview-grid">
+          <p><strong id="dailyPlayedStat">0</strong><span>Played</span></p>
+          <p><strong id="dailyAvgTimeStat">00:00.0</strong><span>Avg Time</span></p>
+          <p><strong id="dailyCurrentStreakStat">0</strong><span>Current Streak</span></p>
+          <p><strong id="dailyMaxStreakStat">0</strong><span>Max Streak</span></p>
+        </div>
       </div>
       <div id="dailyBestPanel" class="daily-best-panel hidden">
         <p id="dailyBestHeadline" class="daily-best-headline"></p>

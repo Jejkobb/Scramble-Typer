@@ -19,6 +19,8 @@ const SEED_QUERY_KEY = "seed";
 const DAILY_HISTORY_STORAGE_KEY = "scrambleTyper.dailyBestHistory.v1";
 const DAILY_HISTORY_MAX_ENTRIES = 120;
 const DAILY_HISTORY_LIST_LIMIT = 4;
+const DAILY_SCRAMBLE_START_DATE = "2026-04-15";
+const MS_PER_DAY = 86400000;
 
 const SWAP_WARNING_DURATION = 1650;
 const SWAP_WARNING_FADE_GAP = 320;
@@ -55,8 +57,13 @@ const ALPHABET = KEY_ROWS.flat();
 const SLOT_LAYOUT = buildSlotLayout();
 const DAILY_SEED = buildDailySeedString();
 const URL_SEED = readSeedFromUrl();
-const INITIAL_SEED = URL_SEED || DAILY_SEED;
-const INITIAL_GAME_MODE = URL_SEED ? "random" : "daily";
+const URL_SEED_IS_FUTURE_DAILY = isFutureDailySeed(URL_SEED, DAILY_SEED);
+const URL_SEED_EFFECTIVE = URL_SEED_IS_FUTURE_DAILY ? "" : URL_SEED;
+const URL_SEED_WARNING = URL_SEED_IS_FUTURE_DAILY
+  ? `That shared daily seed (${formatDailyDateLabel(URL_SEED)}) has not started yet in UTC. You were returned to the menu.`
+  : "";
+const INITIAL_SEED = URL_SEED_EFFECTIVE || DAILY_SEED;
+const INITIAL_GAME_MODE = URL_SEED_EFFECTIVE ? "random" : "daily";
 
 let wordBank = [...FALLBACK_WORD_BANK];
 let wordsByLength = buildWordsByLength(wordBank);
@@ -65,6 +72,7 @@ const pregameView = document.getElementById("pregameView");
 const dailyModeBtn = document.getElementById("dailyModeBtn");
 const randomModeBtn = document.getElementById("randomModeBtn");
 const readyBtn = document.getElementById("readyBtn");
+const pregameWarning = document.getElementById("pregameWarning");
 
 const gameView = document.getElementById("gameView");
 const roundStat = document.getElementById("roundStat");
@@ -95,9 +103,17 @@ const finishModal = document.getElementById("finishModal");
 const finishTitle = document.getElementById("finishTitle");
 const dailyCompletionNote = document.getElementById("dailyCompletionNote");
 const finishSummary = document.getElementById("finishSummary");
+const finishStatsPanel = document.getElementById("finishStatsPanel");
 const finishTime = document.getElementById("finishTime");
 const finishMistakes = document.getElementById("finishMistakes");
 const finishWords = document.getElementById("finishWords");
+const dailySummaryPanel = document.getElementById("dailySummaryPanel");
+const dailyHeroTime = document.getElementById("dailyHeroTime");
+const dailyHeroLabel = document.getElementById("dailyHeroLabel");
+const dailyPlayedStat = document.getElementById("dailyPlayedStat");
+const dailyAvgTimeStat = document.getElementById("dailyAvgTimeStat");
+const dailyCurrentStreakStat = document.getElementById("dailyCurrentStreakStat");
+const dailyMaxStreakStat = document.getElementById("dailyMaxStreakStat");
 const dailyBestPanel = document.getElementById("dailyBestPanel");
 const dailyBestHeadline = document.getElementById("dailyBestHeadline");
 const dailyBestList = document.getElementById("dailyBestList");
@@ -136,9 +152,10 @@ const state = {
   recentWords: [],
   gameMode: INITIAL_GAME_MODE, // daily | random
   runMode: INITIAL_GAME_MODE, // mode frozen at run start
-  seedLockedToUrl: URL_SEED.length > 0,
+  seedLockedToUrl: URL_SEED_EFFECTIVE.length > 0,
   seed: INITIAL_SEED,
   rng: createSeededRng(INITIAL_SEED),
+  pregameWarning: URL_SEED_WARNING,
   shareText: "",
   copyResetTimer: null,
   dailyBestHistory: loadDailyBestHistory(),
@@ -220,6 +237,7 @@ function enterPregame() {
   finishModal.classList.add("hidden");
   pregameView.classList.remove("hidden");
   readyBtn.disabled = state.dictionaryLoadPending;
+  updatePregameWarning();
   updateGameModeUI();
   updateRoundBar();
   updateSwapTrack();
@@ -281,13 +299,22 @@ function updateGameModeUI() {
   }
 }
 
+function updatePregameWarning() {
+  if (!pregameWarning) {
+    return;
+  }
+  const message = state.pregameWarning || "";
+  pregameWarning.textContent = message;
+  pregameWarning.classList.toggle("hidden", message.length === 0);
+}
+
 function resolveSeedForNextRun() {
   if (state.gameMode === "daily") {
     return buildDailySeedString();
   }
 
-  if (state.seedLockedToUrl && URL_SEED) {
-    return URL_SEED;
+  if (state.seedLockedToUrl && URL_SEED_EFFECTIVE) {
+    return URL_SEED_EFFECTIVE;
   }
 
   return generateRandomSeed();
@@ -497,6 +524,8 @@ function finishChallenge() {
   const isDailyRun = state.runMode === "daily";
   const dailyDate = isDailyRun ? getDailyDateFromSeed(state.seed) : "";
   const dailyLabel = isDailyRun ? formatDailyDateLabel(dailyDate) : "";
+  const dailyCompactLabel = isDailyRun ? formatDailyDateCompactLabel(dailyDate) : "";
+  const scrambleNumber = isDailyRun ? getDailyScrambleNumber(dailyDate) : null;
   const isTodayDaily = isDailyRun && dailyDate === buildDailySeedString();
 
   if (isDailyRun) {
@@ -506,7 +535,7 @@ function finishChallenge() {
   }
 
   const statusPrefix = isDailyRun
-    ? (isTodayDaily ? "Today's daily complete" : `Daily complete (${dailyLabel})`)
+    ? (isTodayDaily ? "Today's daily complete" : `Daily complete (${dailyCompactLabel})`)
     : "Challenge complete";
   setStatus(`${statusPrefix}: ${TARGET_SWAPS} swaps in ${finalTime}.`);
   showSwapToast(`${isDailyRun ? "Daily done" : "Clear"} in ${finalTime}.`);
@@ -516,20 +545,37 @@ function finishChallenge() {
   finishWords.textContent = String(state.totalWords);
 
   if (isDailyRun) {
-    finishTitle.textContent = isTodayDaily ? "Today's Daily Complete" : "Daily Complete";
-    dailyCompletionNote.textContent = isTodayDaily
-      ? `Today's daily is complete (${dailyLabel}).`
-      : `Daily complete for ${dailyLabel}.`;
-    if (state.dailyRunResult && state.dailyRunResult.wasNewBest) {
-      dailyCompletionNote.textContent += " New best saved.";
-    }
-    dailyCompletionNote.classList.remove("hidden");
+    const playerStats = getDailyPlayerStats(state.dailyBestHistory);
+    finishTitle.textContent = "Daily Complete";
     finishSummary.classList.add("hidden");
+    finishStatsPanel.classList.add("hidden");
+    dailySummaryPanel.classList.remove("hidden");
+
+    dailyHeroTime.textContent = finalTime;
+    dailyHeroLabel.textContent = scrambleNumber
+      ? `Scramble #${scrambleNumber} (${dailyCompactLabel})`
+      : `Scramble (${dailyCompactLabel})`;
+    dailyPlayedStat.textContent = String(playerStats.playedCount);
+    dailyAvgTimeStat.textContent = playerStats.playedCount > 0
+      ? formatElapsedMs(playerStats.averageMs)
+      : "--";
+    dailyCurrentStreakStat.textContent = String(playerStats.currentStreak);
+    dailyMaxStreakStat.textContent = String(playerStats.maxStreak);
+
+    if (state.dailyRunResult && state.dailyRunResult.wasNewBest) {
+      dailyCompletionNote.textContent = `New best saved for ${dailyLabel}.`;
+      dailyCompletionNote.classList.remove("hidden");
+    } else {
+      dailyCompletionNote.textContent = "";
+      dailyCompletionNote.classList.add("hidden");
+    }
   } else {
     finishTitle.textContent = "Challenge Complete";
     dailyCompletionNote.textContent = "";
     dailyCompletionNote.classList.add("hidden");
     finishSummary.classList.remove("hidden");
+    finishStatsPanel.classList.remove("hidden");
+    dailySummaryPanel.classList.add("hidden");
     finishSummary.textContent = `You completed ${TARGET_SWAPS} swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
   }
 
@@ -547,17 +593,19 @@ function buildShareText() {
   if (state.runMode === "daily") {
     const dailyDate = getDailyDateFromSeed(state.seed);
     const dailyDateLabel = formatDailyDateLabel(dailyDate);
+    const dailyCompactLabel = formatDailyDateCompactLabel(dailyDate);
+    const scrambleNumber = getDailyScrambleNumber(dailyDate);
     const encodedSeed = encodeURIComponent(dailyDate);
     const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
-    const runLabel = dailyDate === buildDailySeedString()
-      ? `today's Scramble Typer Daily (${dailyDateLabel})`
-      : `the Scramble Typer Daily for ${dailyDateLabel}`;
-    return `I finished ${runLabel} in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat it? ${link}`;
+    const scrambleLabel = scrambleNumber
+      ? `Scramble #${scrambleNumber} (${dailyCompactLabel})`
+      : `the daily scramble (${dailyDateLabel})`;
+    return `\u2328\uFE0F\uD83D\uDD00 I finished ${scrambleLabel} in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat me? ${link}`;
   }
 
   const encodedSeed = encodeURIComponent(state.seed);
   const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
-  return `I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
+  return `\u2328\uFE0F I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
 }
 
 async function copyShareScore() {
@@ -597,14 +645,48 @@ function resetFinishModeUI() {
   dailyCompletionNote.textContent = "";
   dailyCompletionNote.classList.add("hidden");
   finishSummary.classList.remove("hidden");
+  finishStatsPanel.classList.remove("hidden");
+  dailySummaryPanel.classList.add("hidden");
+  dailyHeroTime.textContent = "00:00.0";
+  dailyHeroLabel.textContent = "";
+  dailyPlayedStat.textContent = "0";
+  dailyAvgTimeStat.textContent = "00:00.0";
+  dailyCurrentStreakStat.textContent = "0";
+  dailyMaxStreakStat.textContent = "0";
   dailyBestHeadline.textContent = "";
   dailyBestList.innerHTML = "";
   dailyBestPanel.classList.add("hidden");
 }
 
+function isFutureDailySeed(seed, todayDate = buildDailySeedString()) {
+  if (!isValidDailySeedDate(seed) || !isValidDailySeedDate(todayDate)) {
+    return false;
+  }
+  return seed > todayDate;
+}
+
+function isValidDailySeedDate(seed) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalizeSeed(seed));
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false;
+  }
+
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  return utcDate.getUTCFullYear() === year
+    && utcDate.getUTCMonth() === month - 1
+    && utcDate.getUTCDate() === day;
+}
+
 function getDailyDateFromSeed(seed) {
   const normalized = normalizeSeed(seed);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+  if (isValidDailySeedDate(normalized)) {
     return normalized;
   }
   return buildDailySeedString();
@@ -623,6 +705,99 @@ function formatDailyDateLabel(dateString) {
   }
 
   return `${day}${getOrdinalSuffix(day)} of ${MONTH_NAMES[monthIndex]}`;
+}
+
+function formatDailyDateCompactLabel(dateString) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) {
+    return dateString;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return dateString;
+  }
+
+  return `${day}.${month}.${year}`;
+}
+
+function getDailyScrambleNumber(dateString) {
+  const targetDay = toUtcDayNumber(dateString);
+  const startDay = toUtcDayNumber(DAILY_SCRAMBLE_START_DATE);
+  if (!Number.isInteger(targetDay) || !Number.isInteger(startDay) || targetDay < startDay) {
+    return null;
+  }
+  return (targetDay - startDay) + 1;
+}
+
+function toUtcDayNumber(dateString) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  const utcMs = Date.UTC(year, month - 1, day);
+  const utcDate = new Date(utcMs);
+  if (utcDate.getUTCFullYear() !== year || utcDate.getUTCMonth() !== month - 1 || utcDate.getUTCDate() !== day) {
+    return null;
+  }
+  return Math.floor(utcMs / MS_PER_DAY);
+}
+
+function getDailyPlayerStats(historyMap) {
+  const entries = getSortedDailyBestEntries(historyMap);
+  if (entries.length === 0) {
+    return {
+      playedCount: 0,
+      averageMs: 0,
+      currentStreak: 0,
+      maxStreak: 0,
+    };
+  }
+
+  const dailyEntriesAsc = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const playedCount = dailyEntriesAsc.length;
+  const totalMs = dailyEntriesAsc.reduce((sum, item) => sum + item.entry.elapsedMs, 0);
+  const averageMs = Math.round(totalMs / playedCount);
+
+  let currentStreak = 1;
+  for (let i = dailyEntriesAsc.length - 1; i > 0; i -= 1) {
+    const currentDay = toUtcDayNumber(dailyEntriesAsc[i].date);
+    const prevDay = toUtcDayNumber(dailyEntriesAsc[i - 1].date);
+    if (!Number.isInteger(currentDay) || !Number.isInteger(prevDay) || currentDay - prevDay !== 1) {
+      break;
+    }
+    currentStreak += 1;
+  }
+
+  let maxStreak = 1;
+  let runningStreak = 1;
+  for (let i = 1; i < dailyEntriesAsc.length; i += 1) {
+    const prevDay = toUtcDayNumber(dailyEntriesAsc[i - 1].date);
+    const currentDay = toUtcDayNumber(dailyEntriesAsc[i].date);
+    if (Number.isInteger(prevDay) && Number.isInteger(currentDay) && currentDay - prevDay === 1) {
+      runningStreak += 1;
+    } else {
+      runningStreak = 1;
+    }
+    if (runningStreak > maxStreak) {
+      maxStreak = runningStreak;
+    }
+  }
+
+  return {
+    playedCount,
+    averageMs,
+    currentStreak,
+    maxStreak,
+  };
 }
 
 function getOrdinalSuffix(day) {
@@ -693,13 +868,15 @@ function renderDailyBestPanel(showPanel = true) {
   }
 
   dailyBestPanel.classList.remove("hidden");
-  dailyBestHeadline.textContent = "Best Daily Times";
+  dailyBestHeadline.textContent = "Best Times By Date";
 
   for (const item of entries.slice(0, DAILY_HISTORY_LIST_LIMIT)) {
     const row = document.createElement("li");
     const dateEl = document.createElement("span");
     dateEl.className = "date";
-    dateEl.textContent = formatDailyDateLabel(item.date);
+    const scrambleNumber = getDailyScrambleNumber(item.date);
+    const dateLabel = formatDailyDateCompactLabel(item.date);
+    dateEl.textContent = scrambleNumber ? `#${scrambleNumber} - ${dateLabel}` : dateLabel;
 
     const timeEl = document.createElement("span");
     timeEl.className = "time";

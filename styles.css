@@ -100,6 +100,17 @@ h3 {
   font-size: 0.94rem;
 }
 
+.pregame-warning {
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 209, 102, 0.52);
+  background: rgba(255, 209, 102, 0.14);
+  color: #ffe9b3;
+  padding: 8px 10px;
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
 .mode-title {
   margin: 2px 0 0;
   color: #cfe4ec;
@@ -729,7 +740,7 @@ h3 {
 }
 
 .finish-card {
-  width: min(92vw, 420px);
+  width: min(94vw, 440px);
   border-radius: 16px;
   border: 1px solid rgba(130, 196, 210, 0.34);
   background: rgba(9, 19, 27, 0.93);
@@ -751,8 +762,8 @@ h3 {
   border: 1px solid rgba(84, 210, 160, 0.44);
   background: rgba(84, 210, 160, 0.12);
   color: #d2fff0;
-  padding: 8px 10px;
-  font-size: 0.82rem;
+  padding: 7px 10px;
+  font-size: 0.8rem;
 }
 
 .finish-stats {
@@ -785,19 +796,90 @@ h3 {
   flex-wrap: wrap;
 }
 
-.daily-best-panel {
-  border-radius: 10px;
-  border: 1px solid rgba(110, 203, 255, 0.34);
-  background: rgba(110, 203, 255, 0.08);
+.finish-actions .primary-btn,
+.finish-actions .secondary-btn {
+  flex: 1 1 160px;
+}
+
+.daily-summary-panel {
+  border-radius: 12px;
+  border: 1px solid rgba(153, 118, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(153, 118, 255, 0.12), rgba(153, 118, 255, 0.04)),
+    rgba(255, 255, 255, 0.02);
   padding: 10px;
   display: grid;
   gap: 8px;
 }
 
+.daily-hero-time {
+  margin: 0;
+  text-align: center;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.95rem, 7.5vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #ebd9ff;
+  text-shadow: 0 0 14px rgba(163, 111, 255, 0.35);
+}
+
+.daily-hero-label {
+  margin: 0;
+  text-align: center;
+  color: #d8e7f7;
+  font-size: 0.88rem;
+}
+
+.daily-section-title {
+  margin: 0;
+  text-align: center;
+  color: #e3ebf3;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.daily-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.daily-overview-grid p {
+  margin: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 8px 6px;
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+
+.daily-overview-grid strong {
+  font-size: 1.05rem;
+  color: #f3f8ff;
+}
+
+.daily-overview-grid span {
+  color: #c9d9e8;
+  font-size: 0.72rem;
+}
+
+.daily-best-panel {
+  border-radius: 10px;
+  border: 1px solid rgba(110, 203, 255, 0.34);
+  background: rgba(110, 203, 255, 0.08);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+
 .daily-best-headline {
   margin: 0;
   color: #d8f4ff;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .daily-best-list {
@@ -815,8 +897,8 @@ h3 {
   gap: 10px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.07);
-  padding: 7px 8px;
-  font-size: 0.78rem;
+  padding: 6px 8px;
+  font-size: 0.76rem;
   color: #e7f4fa;
 }
 
@@ -966,6 +1048,10 @@ h3 {
   }
 
   .finish-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .daily-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
