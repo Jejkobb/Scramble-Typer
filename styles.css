@@ -745,6 +745,16 @@ h3 {
   font-size: 0.9rem;
 }
 
+.daily-completion-note {
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(84, 210, 160, 0.44);
+  background: rgba(84, 210, 160, 0.12);
+  color: #d2fff0;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
 .finish-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -773,6 +783,51 @@ h3 {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.daily-best-panel {
+  border-radius: 10px;
+  border: 1px solid rgba(110, 203, 255, 0.34);
+  background: rgba(110, 203, 255, 0.08);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.daily-best-headline {
+  margin: 0;
+  color: #d8f4ff;
+  font-size: 0.8rem;
+}
+
+.daily-best-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.daily-best-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 7px 8px;
+  font-size: 0.78rem;
+  color: #e7f4fa;
+}
+
+.daily-best-list .date {
+  color: #c4deea;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.daily-best-list .time {
+  font-weight: 700;
+  color: #e7fff6;
 }
 
 @keyframes wordShake {

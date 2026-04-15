@@ -102,12 +102,17 @@
 
   <div id="finishModal" class="finish-modal hidden" aria-live="polite">
     <div class="finish-card">
-      <h3>Challenge Complete</h3>
+      <h3 id="finishTitle">Challenge Complete</h3>
+      <p id="dailyCompletionNote" class="daily-completion-note hidden"></p>
       <p id="finishSummary" class="finish-summary"></p>
       <div class="finish-stats">
         <p><span>Time</span><strong id="finishTime">00:00.0</strong></p>
         <p><span>Mistakes</span><strong id="finishMistakes">0</strong></p>
         <p><span>Words</span><strong id="finishWords">0</strong></p>
+      </div>
+      <div id="dailyBestPanel" class="daily-best-panel hidden">
+        <p id="dailyBestHeadline" class="daily-best-headline"></p>
+        <ul id="dailyBestList" class="daily-best-list"></ul>
       </div>
       <div class="finish-actions">
         <button id="copyScoreBtn" class="primary-btn" type="button">Share Score</button>

@@ -16,6 +16,9 @@ const WORD_MIN_LENGTH = 4;
 const WORD_MAX_LENGTH = 11;
 const RECENT_WORD_MEMORY = 140;
 const SEED_QUERY_KEY = "seed";
+const DAILY_HISTORY_STORAGE_KEY = "scrambleTyper.dailyBestHistory.v1";
+const DAILY_HISTORY_MAX_ENTRIES = 120;
+const DAILY_HISTORY_LIST_LIMIT = 4;
 
 const SWAP_WARNING_DURATION = 1650;
 const SWAP_WARNING_FADE_GAP = 320;
@@ -35,6 +38,10 @@ const SWAP_COLOR_PALETTE = [
   { solid: "#89f0a8", soft: "rgba(137, 240, 168, 0.24)" },
   { solid: "#ffd166", soft: "rgba(255, 209, 102, 0.24)" },
   { solid: "#c59bff", soft: "rgba(197, 155, 255, 0.24)" },
+];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 const FALLBACK_WORD_BANK = sanitizeWords([
@@ -85,10 +92,15 @@ const overlayKeyA = document.getElementById("overlayKeyA");
 const overlayKeyB = document.getElementById("overlayKeyB");
 
 const finishModal = document.getElementById("finishModal");
+const finishTitle = document.getElementById("finishTitle");
+const dailyCompletionNote = document.getElementById("dailyCompletionNote");
 const finishSummary = document.getElementById("finishSummary");
 const finishTime = document.getElementById("finishTime");
 const finishMistakes = document.getElementById("finishMistakes");
 const finishWords = document.getElementById("finishWords");
+const dailyBestPanel = document.getElementById("dailyBestPanel");
+const dailyBestHeadline = document.getElementById("dailyBestHeadline");
+const dailyBestList = document.getElementById("dailyBestList");
 const copyScoreBtn = document.getElementById("copyScoreBtn");
 const playAgainBtn = document.getElementById("playAgainBtn");
 
@@ -123,11 +135,14 @@ const state = {
   dictionaryWords: wordBank.length,
   recentWords: [],
   gameMode: INITIAL_GAME_MODE, // daily | random
+  runMode: INITIAL_GAME_MODE, // mode frozen at run start
   seedLockedToUrl: URL_SEED.length > 0,
   seed: INITIAL_SEED,
   rng: createSeededRng(INITIAL_SEED),
   shareText: "",
   copyResetTimer: null,
+  dailyBestHistory: loadDailyBestHistory(),
+  dailyRunResult: null,
 };
 
 createKeyboard();
@@ -195,7 +210,7 @@ function bindEvents() {
     });
   }
   readyBtn.addEventListener("click", startChallenge);
-  playAgainBtn.addEventListener("click", startChallenge);
+  playAgainBtn.addEventListener("click", playAgainCurrentMode);
   copyScoreBtn.addEventListener("click", copyShareScore);
 }
 
@@ -220,6 +235,7 @@ function startChallenge() {
   finishModal.classList.add("hidden");
   gameView.classList.remove("hidden");
   state.seed = resolveSeedForNextRun();
+  state.runMode = state.gameMode;
   state.rng = createSeededRng(state.seed);
 
   state.phase = "playing";
@@ -232,6 +248,14 @@ function startChallenge() {
   renderWord();
   updateStats();
   setStatus(`Finish ${TARGET_SWAPS} swaps as fast as possible.`);
+}
+
+function playAgainCurrentMode() {
+  if (state.runMode === "daily" || state.runMode === "random") {
+    state.gameMode = state.runMode;
+    updateGameModeUI();
+  }
+  startChallenge();
 }
 
 function setGameMode(mode) {
@@ -287,10 +311,12 @@ function resetRunState() {
   state.recentWords = [];
   state.rng = createSeededRng(state.seed);
   state.shareText = "";
+  state.dailyRunResult = null;
 
   clearTimeout(state.copyResetTimer);
   state.copyResetTimer = null;
-  copyScoreBtn.textContent = "Share Score";
+  copyScoreBtn.textContent = getShareButtonLabel();
+  resetFinishModeUI();
   updateSwapLegend();
 
   resetTimer();
@@ -468,16 +494,49 @@ function finishChallenge() {
   stopTimer();
 
   const finalTime = formatElapsedMs(state.elapsedMs);
-  setStatus(`Challenge complete: ${TARGET_SWAPS} swaps in ${finalTime}.`);
-  showSwapToast(`Clear in ${finalTime}.`);
+  const isDailyRun = state.runMode === "daily";
+  const dailyDate = isDailyRun ? getDailyDateFromSeed(state.seed) : "";
+  const dailyLabel = isDailyRun ? formatDailyDateLabel(dailyDate) : "";
+  const isTodayDaily = isDailyRun && dailyDate === buildDailySeedString();
+
+  if (isDailyRun) {
+    state.dailyRunResult = recordDailyBestForDate(dailyDate, state.elapsedMs, state.mistakes, state.totalWords);
+  } else {
+    state.dailyRunResult = null;
+  }
+
+  const statusPrefix = isDailyRun
+    ? (isTodayDaily ? "Today's daily complete" : `Daily complete (${dailyLabel})`)
+    : "Challenge complete";
+  setStatus(`${statusPrefix}: ${TARGET_SWAPS} swaps in ${finalTime}.`);
+  showSwapToast(`${isDailyRun ? "Daily done" : "Clear"} in ${finalTime}.`);
 
   finishTime.textContent = finalTime;
   finishMistakes.textContent = String(state.mistakes);
   finishWords.textContent = String(state.totalWords);
-  finishSummary.textContent = `You completed ${TARGET_SWAPS} swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
+
+  if (isDailyRun) {
+    finishTitle.textContent = isTodayDaily ? "Today's Daily Complete" : "Daily Complete";
+    dailyCompletionNote.textContent = isTodayDaily
+      ? `Today's daily is complete (${dailyLabel}).`
+      : `Daily complete for ${dailyLabel}.`;
+    if (state.dailyRunResult && state.dailyRunResult.wasNewBest) {
+      dailyCompletionNote.textContent += " New best saved.";
+    }
+    dailyCompletionNote.classList.remove("hidden");
+    finishSummary.classList.add("hidden");
+  } else {
+    finishTitle.textContent = "Challenge Complete";
+    dailyCompletionNote.textContent = "";
+    dailyCompletionNote.classList.add("hidden");
+    finishSummary.classList.remove("hidden");
+    finishSummary.textContent = `You completed ${TARGET_SWAPS} swaps in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}.`;
+  }
+
+  renderDailyBestPanel(isDailyRun);
 
   state.shareText = buildShareText();
-  copyScoreBtn.textContent = "Share Score";
+  copyScoreBtn.textContent = getShareButtonLabel();
   finishModal.classList.remove("hidden");
   updateStats();
 }
@@ -485,6 +544,17 @@ function finishChallenge() {
 function buildShareText() {
   const finalTime = formatElapsedMs(state.elapsedMs);
   const baseLink = `${window.location.origin}${window.location.pathname}`;
+  if (state.runMode === "daily") {
+    const dailyDate = getDailyDateFromSeed(state.seed);
+    const dailyDateLabel = formatDailyDateLabel(dailyDate);
+    const encodedSeed = encodeURIComponent(dailyDate);
+    const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
+    const runLabel = dailyDate === buildDailySeedString()
+      ? `today's Scramble Typer Daily (${dailyDateLabel})`
+      : `the Scramble Typer Daily for ${dailyDateLabel}`;
+    return `I finished ${runLabel} in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat it? ${link}`;
+  }
+
   const encodedSeed = encodeURIComponent(state.seed);
   const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
   return `I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
@@ -510,11 +580,220 @@ async function copyShareScore() {
     copyScoreBtn.textContent = "Copied to Clipboard";
     clearTimeout(state.copyResetTimer);
     state.copyResetTimer = setTimeout(() => {
-      copyScoreBtn.textContent = "Share Score";
+      copyScoreBtn.textContent = getShareButtonLabel();
     }, COPY_FEEDBACK_DURATION);
   } catch (_error) {
     copyScoreBtn.textContent = "Copy Failed";
   }
+}
+
+function getShareButtonLabel() {
+  const activeMode = state.phase === "finished" ? state.runMode : state.gameMode;
+  return activeMode === "daily" ? "Share Daily Score" : "Share Score";
+}
+
+function resetFinishModeUI() {
+  finishTitle.textContent = "Challenge Complete";
+  dailyCompletionNote.textContent = "";
+  dailyCompletionNote.classList.add("hidden");
+  finishSummary.classList.remove("hidden");
+  dailyBestHeadline.textContent = "";
+  dailyBestList.innerHTML = "";
+  dailyBestPanel.classList.add("hidden");
+}
+
+function getDailyDateFromSeed(seed) {
+  const normalized = normalizeSeed(seed);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+  return buildDailySeedString();
+}
+
+function formatDailyDateLabel(dateString) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) {
+    return dateString;
+  }
+
+  const day = Number(match[3]);
+  const monthIndex = Number(match[2]) - 1;
+  if (!Number.isInteger(day) || day <= 0 || day > 31 || monthIndex < 0 || monthIndex >= MONTH_NAMES.length) {
+    return dateString;
+  }
+
+  return `${day}${getOrdinalSuffix(day)} of ${MONTH_NAMES[monthIndex]}`;
+}
+
+function getOrdinalSuffix(day) {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return "th";
+  }
+
+  const mod10 = day % 10;
+  if (mod10 === 1) {
+    return "st";
+  }
+  if (mod10 === 2) {
+    return "nd";
+  }
+  if (mod10 === 3) {
+    return "rd";
+  }
+  return "th";
+}
+
+function recordDailyBestForDate(date, elapsedMs, mistakes, totalWords) {
+  const dailyDate = getDailyDateFromSeed(date);
+  const candidate = {
+    elapsedMs: Math.max(1, Math.round(elapsedMs)),
+    mistakes: Math.max(0, Math.round(mistakes)),
+    totalWords: Math.max(0, Math.round(totalWords)),
+    updatedAt: new Date().toISOString(),
+  };
+  const currentBest = state.dailyBestHistory[dailyDate] || null;
+  const isBetter = !currentBest
+    || candidate.elapsedMs < currentBest.elapsedMs
+    || (candidate.elapsedMs === currentBest.elapsedMs && candidate.mistakes < currentBest.mistakes);
+
+  if (isBetter) {
+    state.dailyBestHistory[dailyDate] = candidate;
+    state.dailyBestHistory = trimDailyBestHistory(state.dailyBestHistory);
+    saveDailyBestHistory(state.dailyBestHistory);
+    return {
+      date: dailyDate,
+      wasNewBest: true,
+      bestEntry: state.dailyBestHistory[dailyDate],
+    };
+  }
+
+  return {
+    date: dailyDate,
+    wasNewBest: false,
+    bestEntry: currentBest,
+  };
+}
+
+function renderDailyBestPanel(showPanel = true) {
+  if (!showPanel) {
+    dailyBestHeadline.textContent = "";
+    dailyBestList.innerHTML = "";
+    dailyBestPanel.classList.add("hidden");
+    return;
+  }
+
+  const entries = getSortedDailyBestEntries(state.dailyBestHistory);
+  dailyBestList.innerHTML = "";
+
+  if (entries.length === 0) {
+    dailyBestHeadline.textContent = "";
+    dailyBestPanel.classList.add("hidden");
+    return;
+  }
+
+  dailyBestPanel.classList.remove("hidden");
+  dailyBestHeadline.textContent = "Best Daily Times";
+
+  for (const item of entries.slice(0, DAILY_HISTORY_LIST_LIMIT)) {
+    const row = document.createElement("li");
+    const dateEl = document.createElement("span");
+    dateEl.className = "date";
+    dateEl.textContent = formatDailyDateLabel(item.date);
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "time";
+    timeEl.textContent = formatElapsedMs(item.entry.elapsedMs);
+
+    row.appendChild(dateEl);
+    row.appendChild(timeEl);
+    dailyBestList.appendChild(row);
+  }
+}
+
+function getSortedDailyBestEntries(historyMap) {
+  return Object.entries(historyMap)
+    .map(([date, entry]) => ({ date, entry }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function loadDailyBestHistory() {
+  try {
+    const storage = window.localStorage;
+    if (!storage) {
+      return {};
+    }
+    const raw = storage.getItem(DAILY_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    const sanitized = sanitizeDailyBestHistory(parsed);
+    return trimDailyBestHistory(sanitized);
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveDailyBestHistory(historyMap) {
+  try {
+    const storage = window.localStorage;
+    if (!storage) {
+      return;
+    }
+    const trimmed = trimDailyBestHistory(historyMap);
+    storage.setItem(DAILY_HISTORY_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (_error) {
+    // Ignore storage failures (private mode, quota, etc.).
+  }
+}
+
+function sanitizeDailyBestHistory(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const cleaned = {};
+  for (const [date, entry] of Object.entries(value)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      continue;
+    }
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const elapsedMs = Math.round(Number(entry.elapsedMs));
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) {
+      continue;
+    }
+
+    const mistakes = Math.max(0, Math.round(Number(entry.mistakes) || 0));
+    const totalWords = Math.max(0, Math.round(Number(entry.totalWords) || 0));
+    const updatedAt = typeof entry.updatedAt === "string"
+      ? entry.updatedAt
+      : "";
+
+    cleaned[date] = {
+      elapsedMs,
+      mistakes,
+      totalWords,
+      updatedAt,
+    };
+  }
+
+  return cleaned;
+}
+
+function trimDailyBestHistory(historyMap) {
+  const entries = Object.entries(historyMap)
+    .filter(([date, entry]) => /^\d{4}-\d{2}-\d{2}$/.test(date)
+      && entry
+      && Number.isFinite(Number(entry.elapsedMs))
+      && Number(entry.elapsedMs) > 0)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, DAILY_HISTORY_MAX_ENTRIES);
+
+  return Object.fromEntries(entries);
 }
 
 async function animateSwap(slotA, slotB, roundRecentSwapLetters = null, colorIndex = 0) {
