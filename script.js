@@ -600,12 +600,12 @@ function buildShareText() {
     const scrambleLabel = scrambleNumber
       ? `Scramble #${scrambleNumber} (${dailyCompactLabel})`
       : `the daily scramble (${dailyDateLabel})`;
-    return `\u2328\uFE0F\uD83D\uDD00 I finished ${scrambleLabel} in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat me? ${link}`;
+    return `\u2328\uFE0F I finished ${scrambleLabel} in ${finalTime} \uD83C\uDF89 with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Can you beat me? ${link}`;
   }
 
   const encodedSeed = encodeURIComponent(state.seed);
   const link = `${baseLink}?${SEED_QUERY_KEY}=${encodedSeed}`;
-  return `\u2328\uFE0F I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
+  return `\u2328\uFE0F I finished Scramble Typer (${TARGET_SWAPS}-swap challenge) in ${finalTime} \uD83C\uDF89 with ${state.mistakes} mistake${state.mistakes === 1 ? "" : "s"}. Beat me: ${link}`;
 }
 
 async function copyShareScore() {
