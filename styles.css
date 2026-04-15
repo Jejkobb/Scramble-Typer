@@ -100,6 +100,14 @@ h3 {
   font-size: 0.94rem;
 }
 
+.pregame-reset-line {
+  margin: 0;
+  color: #b7f2e2;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
 .pregame-warning {
   margin: 0;
   border-radius: 10px;
@@ -828,6 +836,14 @@ h3 {
   text-align: center;
   color: #d8e7f7;
   font-size: 0.88rem;
+}
+
+.daily-reset-line {
+  margin: 0;
+  text-align: center;
+  color: #b8f1e7;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.75rem;
 }
 
 .daily-section-title {

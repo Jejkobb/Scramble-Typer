@@ -21,6 +21,7 @@ const DAILY_HISTORY_MAX_ENTRIES = 120;
 const DAILY_HISTORY_LIST_LIMIT = 4;
 const DAILY_SCRAMBLE_START_DATE = "2026-04-15";
 const MS_PER_DAY = 86400000;
+const DAILY_RESET_TICK_MS = 1000;
 
 const SWAP_WARNING_DURATION = 1650;
 const SWAP_WARNING_FADE_GAP = 320;
@@ -62,8 +63,11 @@ const URL_SEED_EFFECTIVE = URL_SEED_IS_FUTURE_DAILY ? "" : URL_SEED;
 const URL_SEED_WARNING = URL_SEED_IS_FUTURE_DAILY
   ? `That shared daily seed (${formatDailyDateLabel(URL_SEED)}) has not started yet in UTC. You were returned to the menu.`
   : "";
+const URL_SEED_IS_TODAY_DAILY = isValidDailySeedDate(URL_SEED_EFFECTIVE) && URL_SEED_EFFECTIVE === DAILY_SEED;
 const INITIAL_SEED = URL_SEED_EFFECTIVE || DAILY_SEED;
-const INITIAL_GAME_MODE = URL_SEED_EFFECTIVE ? "random" : "daily";
+const INITIAL_GAME_MODE = URL_SEED_EFFECTIVE
+  ? (URL_SEED_IS_TODAY_DAILY ? "daily" : "random")
+  : "daily";
 
 let wordBank = [...FALLBACK_WORD_BANK];
 let wordsByLength = buildWordsByLength(wordBank);
@@ -73,6 +77,7 @@ const dailyModeBtn = document.getElementById("dailyModeBtn");
 const randomModeBtn = document.getElementById("randomModeBtn");
 const readyBtn = document.getElementById("readyBtn");
 const pregameWarning = document.getElementById("pregameWarning");
+const pregameResetCountdown = document.getElementById("pregameResetCountdown");
 
 const gameView = document.getElementById("gameView");
 const roundStat = document.getElementById("roundStat");
@@ -110,6 +115,7 @@ const finishWords = document.getElementById("finishWords");
 const dailySummaryPanel = document.getElementById("dailySummaryPanel");
 const dailyHeroTime = document.getElementById("dailyHeroTime");
 const dailyHeroLabel = document.getElementById("dailyHeroLabel");
+const dailyResetCountdown = document.getElementById("dailyResetCountdown");
 const dailyPlayedStat = document.getElementById("dailyPlayedStat");
 const dailyAvgTimeStat = document.getElementById("dailyAvgTimeStat");
 const dailyCurrentStreakStat = document.getElementById("dailyCurrentStreakStat");
@@ -156,6 +162,7 @@ const state = {
   seed: INITIAL_SEED,
   rng: createSeededRng(INITIAL_SEED),
   pregameWarning: URL_SEED_WARNING,
+  dailyResetTicker: null,
   shareText: "",
   copyResetTimer: null,
   dailyBestHistory: loadDailyBestHistory(),
@@ -165,6 +172,7 @@ const state = {
 createKeyboard();
 bindEvents();
 enterPregame();
+startDailyResetCountdownTicker();
 void loadLocalWordBank();
 
 function buildSlotLayout() {
@@ -306,6 +314,41 @@ function updatePregameWarning() {
   const message = state.pregameWarning || "";
   pregameWarning.textContent = message;
   pregameWarning.classList.toggle("hidden", message.length === 0);
+}
+
+function startDailyResetCountdownTicker() {
+  updateDailyResetCountdown();
+  if (state.dailyResetTicker) {
+    clearInterval(state.dailyResetTicker);
+  }
+  state.dailyResetTicker = setInterval(updateDailyResetCountdown, DAILY_RESET_TICK_MS);
+}
+
+function updateDailyResetCountdown() {
+  const text = `Next daily in ${formatCountdownMs(getMsUntilNextUtcDay())} (UTC)`;
+  if (pregameResetCountdown) {
+    pregameResetCountdown.textContent = text;
+  }
+  if (dailyResetCountdown) {
+    dailyResetCountdown.textContent = text;
+  }
+}
+
+function getMsUntilNextUtcDay() {
+  const now = new Date();
+  const nextUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(0, nextUtcMidnight - now.getTime());
+}
+
+function formatCountdownMs(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
 }
 
 function resolveSeedForNextRun() {
