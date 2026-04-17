@@ -78,6 +78,7 @@ const randomModeBtn = document.getElementById("randomModeBtn");
 const readyBtn = document.getElementById("readyBtn");
 const pregameWarning = document.getElementById("pregameWarning");
 const pregameResetCountdown = document.getElementById("pregameResetCountdown");
+const resetRunBtn = document.getElementById("resetRunBtn");
 
 const gameView = document.getElementById("gameView");
 const roundStat = document.getElementById("roundStat");
@@ -234,6 +235,9 @@ function bindEvents() {
       setGameMode("random");
     });
   }
+  if (resetRunBtn) {
+    resetRunBtn.addEventListener("click", restartCurrentRun);
+  }
   readyBtn.addEventListener("click", startChallenge);
   playAgainBtn.addEventListener("click", playAgainCurrentMode);
   copyScoreBtn.addEventListener("click", copyShareScore);
@@ -251,16 +255,25 @@ function enterPregame() {
   updateSwapTrack();
 }
 
-function startChallenge() {
+function startChallenge(options = {}) {
   if (state.dictionaryLoadPending) {
     return;
+  }
+
+  const modeOverride = options.modeOverride === "daily" || options.modeOverride === "random"
+    ? options.modeOverride
+    : "";
+  if (modeOverride) {
+    state.gameMode = modeOverride;
+    updateGameModeUI();
   }
 
   resetRunState();
   pregameView.classList.add("hidden");
   finishModal.classList.add("hidden");
   gameView.classList.remove("hidden");
-  state.seed = resolveSeedForNextRun();
+  const seedOverride = normalizeSeed(options.seedOverride);
+  state.seed = seedOverride || resolveSeedForNextRun();
   state.runMode = state.gameMode;
   state.rng = createSeededRng(state.seed);
 
@@ -282,6 +295,25 @@ function playAgainCurrentMode() {
     updateGameModeUI();
   }
   startChallenge();
+}
+
+function restartCurrentRun() {
+  if (state.phase === "pregame") {
+    startChallenge();
+    return;
+  }
+  if (state.phase === "scrambling") {
+    setStatus("Wait for the current swap animation to finish, then restart.");
+    return;
+  }
+
+  const mode = state.runMode === "daily" || state.runMode === "random"
+    ? state.runMode
+    : state.gameMode;
+  startChallenge({
+    modeOverride: mode,
+    seedOverride: state.seed,
+  });
 }
 
 function setGameMode(mode) {
@@ -393,10 +425,17 @@ function resetRunState() {
 }
 
 function onKeyDown(event) {
-  if (state.phase !== "playing") {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
     return;
   }
-  if (event.ctrlKey || event.metaKey || event.altKey) {
+
+  if (state.phase === "pregame" && isSpacebarEvent(event) && !isInteractiveTarget(event.target)) {
+    event.preventDefault();
+    startChallenge();
+    return;
+  }
+
+  if (state.phase !== "playing") {
     return;
   }
 
@@ -413,6 +452,17 @@ function onKeyDown(event) {
 
   activateToken(token);
   processTypedLetter(token.letter);
+}
+
+function isSpacebarEvent(event) {
+  return event.key === " " || event.key === "Spacebar" || event.code === "Space";
+}
+
+function isInteractiveTarget(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(target.closest("button, a, input, textarea, select, [contenteditable='true'], [role='button']"));
 }
 
 function activateToken(token) {
